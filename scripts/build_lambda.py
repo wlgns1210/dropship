@@ -107,6 +107,19 @@ def verify(specs: list[str]) -> int:
     검증은 통과하고 Lambda 에서만 죽는다. 그래서 로드된 모듈의 경로가 실제로
     패키지 안인지까지 확인한다.
     """
+    # 검증은 Lambda 환경을 흉내 내야 하므로 런타임이 제공하는 boto3 가 필요하다.
+    # 없으면 "패키지가 잘못됐다" 가 아니라 "검증 환경이 덜 갖춰졌다" 이므로
+    # 원인을 구분해서 알려준다.
+    try:
+        import boto3  # noqa: F401
+    except ImportError:
+        print(
+            "검증하려면 boto3 가 필요합니다 (Lambda 런타임이 제공하는 것을 흉내 냄).\n"
+            "  pip install boto3",
+            file=sys.stderr,
+        )
+        return 1
+
     # 메타데이터가 실제로 남아 있는지 파일 시스템에서 직접 본다.
     missing = [
         spec
