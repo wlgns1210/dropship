@@ -1,0 +1,25 @@
+# 레포 전체에 적용되는 하나의 ruff 설정.
+#
+# apps/api/pyproject.toml 안에 두면 scripts/ 는 이 설정을 못 찾아 기본 규칙으로
+# 검사된다(ruff 는 각 파일에서 위로 올라가며 설정을 찾는다). 그 결과 같은 코드가
+# 디렉터리에 따라 다른 기준으로 검사되어 혼란스러운 경고가 나온다.
+line-length = 100
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+    "B008",    # FastAPI 의 Depends() 기본값 패턴
+    "RUF002",  # 주석·독스트링의 유니코드 기호(×, → 등). 한국어 문서에서 정상이다.
+    "RUF003",
+]
+
+[lint.isort]
+# 이걸 선언하지 않으면 ruff 가 app / tests 를 서드파티로 보고 pytest·boto3 와
+# 같은 블록에 섞어버린다. 우리 코드와 외부 라이브러리는 눈으로 구분돼야 한다.
+known-first-party = ["app", "tests"]
+
+[lint.per-file-ignores]
+# 테스트 픽스처는 환경 변수를 세팅한 뒤에 임포트해야 하는 경우가 있다.
+"apps/api/tests/conftest.py" = ["E402"]
+"scripts/*.py" = ["E402"]

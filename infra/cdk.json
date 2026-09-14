@@ -1,0 +1,30 @@
+{
+  "app": "python app.py",
+  "watch": {
+    "include": ["**"],
+    "exclude": ["README.md", "cdk*.json", "requirements*.txt", "**/__pycache__"]
+  },
+  "context": {
+    "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
+    "@aws-cdk/core:checkSecretUsage": true,
+    "@aws-cdk/aws-iam:minimizePolicies": true,
+    "@aws-cdk/core:validateSnapshotRemovalPolicy": true,
+    "@aws-cdk/aws-s3:createDefaultLoggingPolicy": true,
+    "@aws-cdk/aws-cloudfront:useOriginAccessControl": true,
+    "@aws-cdk/core:target-partitions": ["aws"],
+
+    "//": "── 배포 설정 ─────────────────────────────────────────",
+    "//alertEmail": "알람 수신 이메일. 저장소가 공개라 여기 적지 않는다. 환경 변수 ALERT_EMAIL 로 넘길 것. 비우면 SNS 구독과 예산 알림을 만들지 않는다.",
+    "alertEmail": "",
+    "//monthlyBudgetUsd": "AWS Budgets 임계값(USD).",
+    "monthlyBudgetUsd": 5,
+    "//enableWaf": "WAF Web ACL 생성 여부. 월 약 $10 고정 비용이 붙는다.",
+    "enableWaf": false,
+    "//domainName": "커스텀 도메인. 비우면 CloudFront 기본 도메인을 쓴다.",
+    "domainName": "",
+    "//certificateArn": "us-east-1 의 ACM 인증서 ARN. domainName 을 쓸 때만 필요.",
+    "certificateArn": "",
+    "//githubRepo": "OIDC 배포를 허용할 리포. 예: owner/dropship",
+    "githubRepo": ""
+  }
+}

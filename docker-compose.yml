@@ -1,0 +1,23 @@
+# 로컬 개발용 AWS 에뮬레이터.
+# LocalStack 하나로 S3 + DynamoDB 를 모두 띄운다. 별도 DynamoDB Local 컨테이너는 쓰지 않는다
+# (LocalStack 쪽이 boto3 엔드포인트를 하나로 통일할 수 있어 설정이 단순해진다).
+services:
+  localstack:
+    image: localstack/localstack:3.8
+    container_name: dropship-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: s3,dynamodb
+      DEBUG: "0"
+      # presigned URL 검증을 실제 AWS와 동일하게 맞춘다
+      S3_SKIP_SIGNATURE_VALIDATION: "0"
+      PERSISTENCE: "1"
+    volumes:
+      - ./.localstack:/var/lib/localstack
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal s3 ls && awslocal dynamodb list-tables"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
+      start_period: 20s

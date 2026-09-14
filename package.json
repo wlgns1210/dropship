@@ -1,0 +1,19 @@
+{
+  "name": "dropship",
+  "private": true,
+  "version": "0.1.0",
+  "description": "익명 파일 전송 서비스 — 링크와 QR로 보내고, 정해진 기간이 지나면 사라진다",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace apps/web",
+    "build": "npm run build --workspace apps/web",
+    "lint": "npm run lint --workspace apps/web",
+    "typecheck": "npm run typecheck --workspace apps/web",
+    "gen:api": "node scripts/gen-api-types.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

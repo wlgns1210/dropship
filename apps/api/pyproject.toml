@@ -1,0 +1,44 @@
+[project]
+name = "dropship-api"
+version = "0.1.0"
+description = "Dropship 파일 전송 서비스 API"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+    "boto3>=1.35",
+    "mangum>=0.19",
+    "python-ulid>=2.7",
+    "cryptography>=43.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "uvicorn[standard]>=0.31",
+    "pytest>=8.3",
+    "httpx>=0.27",
+    "moto[s3,dynamodb]>=5.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+# ruff 설정은 레포 루트의 ruff.toml 에 있다 (scripts/ 까지 같은 기준으로 검사하려면
+# 설정이 루트에 있어야 한다).
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_ignores = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
