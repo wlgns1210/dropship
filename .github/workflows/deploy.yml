@@ -1,0 +1,97 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 배포가 겹치면 CloudFormation 이 UPDATE_IN_PROGRESS 로 충돌한다.
+# 진행 중인 배포는 끝까지 두고, 뒤에 온 것만 기다리게 한다.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  # OIDC 토큰 발급에 필요하다. 이게 없으면 장기 액세스 키를 써야 한다.
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+
+jobs:
+  deploy:
+    name: AWS 배포
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: AWS 자격증명 (OIDC — 장기 키 없음)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/dropship-github-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 프론트엔드 빌드
+        run: |
+          npm ci
+          npm run build --workspace apps/web
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          # 운영에서는 CloudFront 가 프론트와 API 를 같은 도메인에 묶으므로
+          # 상대 경로(/api/...)로 호출한다.
+          NEXT_PUBLIC_API_BASE_URL: ""
+
+      - name: Lambda 패키지 빌드
+        run: python scripts/build_lambda.py
+
+      - name: CDK 설치
+        run: |
+          npm install -g aws-cdk@2
+          pip install -r infra/requirements.txt
+
+      - name: 배포
+        working-directory: infra
+        run: cdk deploy DropshipStack --require-approval never --outputs-file ../cdk-outputs.json
+        env:
+          ORIGIN_SECRET: ${{ secrets.ORIGIN_SECRET }}
+          IP_HASH_SALT: ${{ secrets.IP_HASH_SALT }}
+          CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+          CDK_DEFAULT_REGION: ${{ env.AWS_REGION }}
+
+      - name: 배포 결과 요약
+        run: |
+          SITE=$(python -c "import json;print(json.load(open('cdk-outputs.json'))['DropshipStack']['SiteUrl'])")
+          echo "### 배포 완료" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "$SITE" >> "$GITHUB_STEP_SUMMARY"
+          echo "SITE_URL=$SITE" >> "$GITHUB_ENV"
+
+      # 배포가 실제로 살아났는지 확인한다. CloudFormation 이 성공해도
+      # Lambda 가 임포트에서 죽거나 CloudFront 라우팅이 틀릴 수 있다.
+      - name: 배포 후 스모크 테스트
+        run: |
+          set -e
+          for i in $(seq 1 20); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" "$SITE_URL/api/health" || true)
+            if [ "$CODE" = "200" ]; then echo "API 정상"; break; fi
+            echo "  대기 중… ($i/20, 현재 $CODE)"; sleep 15
+          done
+          [ "$CODE" = "200" ] || { echo "API 헬스체크 실패"; exit 1; }
+
+          curl -sf "$SITE_URL/" | grep -q "끌어다 놓으세요" && echo "업로드 화면 정상"
+          # 공유 링크 경로가 404 가 아니라 앱 셸을 200 으로 돌려줘야 한다.
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" "$SITE_URL/oslo/123456")
+          [ "$CODE" = "200" ] || { echo "공유 링크 경로가 $CODE 를 반환"; exit 1; }
+          echo "공유 링크 라우팅 정상"

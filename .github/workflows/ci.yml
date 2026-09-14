@@ -1,0 +1,78 @@
+name: CI
+
+# 배포하지 않는 검사만 한다. AWS 자격증명이 필요 없어 포크 PR 에서도 돈다.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API (ruff · mypy · pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 의존성 설치
+        run: pip install -e "apps/api[dev]"
+
+      - name: ruff
+        run: ruff check apps/api scripts
+
+      - name: mypy
+        working-directory: apps/api
+        run: mypy app
+
+      # moto 로 S3·DynamoDB 를 프로세스 안에서 흉내내므로 AWS 자격증명도
+      # Docker 도 필요 없다.
+      - name: pytest
+        working-directory: apps/api
+        run: pytest -q
+
+  web:
+    name: Web (tsc · eslint · build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - run: npm ci
+
+      - name: 타입 검사
+        run: npm run typecheck --workspace apps/web
+
+      - name: 린트
+        run: npm run lint --workspace apps/web
+
+      - name: 빌드
+        run: npm run build --workspace apps/web
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  lambda-package:
+    name: Lambda 패키지 빌드 검증
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 배포 전에 패키지가 만들어지고 핸들러가 임포트되는지 확인한다.
+      # 이게 깨지면 배포는 성공하고 첫 요청에서 ImportError 로 죽는다.
+      - name: 패키지 빌드
+        run: python scripts/build_lambda.py
