@@ -1,8 +1,12 @@
 name: Deploy
 
+# 자동 배포는 아직 꺼져 있다. OIDC 역할(DropshipCicdStack)과 저장소 시크릿이
+# 준비되기 전에 main 에 푸시하면 매번 빨간 X 만 남기 때문이다.
+#
+# 준비가 끝나면 아래 push 트리거의 주석을 풀면 된다 (docs/DEPLOY.md 참고).
 on:
-  push:
-    branches: [main]
+  # push:
+  #   branches: [main]
   workflow_dispatch:
 
 # 배포가 겹치면 CloudFormation 이 UPDATE_IN_PROGRESS 로 충돌한다.
