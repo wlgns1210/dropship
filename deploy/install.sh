@@ -101,7 +101,20 @@ systemctl daemon-reload
 
 # ── nginx ─────────────────────────────────────────────────────
 say "nginx 설정"
+# 앱 라우팅은 include 로 한 곳에만 둔다. HTTP(80)와 HTTPS(443) 블록이 같은
+# 파일을 읽으므로, 한쪽만 고쳐서 생기는 불일치가 없다.
+mkdir -p /etc/nginx/dropship-app /etc/nginx/dropship-http /var/www/certbot
+cp "$REPO_DIR/deploy/nginx-app.inc" /etc/nginx/dropship-app/app.conf
 cp "$REPO_DIR/deploy/nginx.conf" /etc/nginx/conf.d/dropship.conf
+
+# 80 번 블록: TLS 가 이미 켜져 있으면 리다이렉트를 유지하고, 아니면 앱을
+# 직접 서비스한다. 이 판단이 없으면 재설치할 때마다 HTTPS 리다이렉트가
+# 지워져 평문으로 되돌아간다.
+if [ -f /etc/nginx/dropship-http/redirect.conf ]; then
+    echo "  TLS 리다이렉트 유지"
+else
+    cp "$REPO_DIR/deploy/nginx-app.inc" /etc/nginx/dropship-http/app.conf
+fi
 
 # AL2023 기본 설정에도 80 번을 듣는 server 블록이 있다. 그대로 두면
 # "conflicting server name" 경고가 뜨고, 우리 블록이 default_server 라 동작은
