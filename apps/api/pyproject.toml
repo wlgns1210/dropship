@@ -14,6 +14,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# 단일 EC2 모드에서 상주 서버로 돌 때만 필요하다. Lambda 에서는 런타임이
+# 요청을 직접 넘겨주므로 ASGI 서버가 필요 없고, 넣으면 패키지만 커진다.
+server = ["uvicorn[standard]>=0.31"]
 dev = [
     "uvicorn[standard]>=0.31",
     "pytest>=8.3",

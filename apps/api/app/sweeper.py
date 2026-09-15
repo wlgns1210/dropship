@@ -11,10 +11,6 @@ import logging
 import time
 from typing import Any
 
-from app.config import get_settings
-from app.services.repository import Repository
-from app.services.storage import S3Storage
-
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -23,9 +19,12 @@ BATCH_LIMIT = 200
 
 
 def sweep(now: int | None = None) -> dict[str, int]:
-    settings = get_settings()
-    repo = Repository(settings)
-    storage = S3Storage(settings)
+    # 배포 형태에 맞는 구현을 deps 가 골라준다. Sweeper 는 S3 인지 로컬
+    # 디스크인지, DynamoDB 인지 SQLite 인지 알 필요가 없다.
+    from app.deps import get_repository, get_storage
+
+    repo = get_repository()
+    storage = get_storage()
 
     cutoff = now if now is not None else int(time.time())
     expired = repo.expired_transfers(now=cutoff, limit=BATCH_LIMIT)
@@ -48,10 +47,21 @@ def sweep(now: int | None = None) -> dict[str, int]:
             # 한 건이 실패해도 나머지는 계속 지운다. 다음 실행에서 재시도된다.
             logger.exception("전송 정리 실패: %s", transfer.get("code"))
 
+    # SQLite 에는 DynamoDB 의 TTL 같은 자동 만료가 없다. 쿼터·레이트리밋 행을
+    # 여기서 같이 치우지 않으면 테이블이 무한히 자란다.
+    purged = 0
+    purge = getattr(repo, "purge_stale_counters", None)
+    if purge is not None:
+        try:
+            purged = purge()
+        except Exception:
+            logger.exception("카운터 정리 실패")
+
     logger.info(
-        "sweep 완료: 전송 %d건, 객체 %d개 삭제", deleted_transfers, deleted_objects
+        "sweep 완료: 전송 %d건, 객체 %d개, 카운터 %d행 삭제",
+        deleted_transfers, deleted_objects, purged,
     )
-    return {"transfers": deleted_transfers, "objects": deleted_objects}
+    return {"transfers": deleted_transfers, "objects": deleted_objects, "counters": purged}
 
 
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, int]:

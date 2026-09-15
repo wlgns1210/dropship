@@ -46,6 +46,16 @@ def check(label: str, condition: bool, detail: str = "") -> None:
         print(f"  FAIL {label}" + (f" — {detail}" if detail else ""))
 
 
+def absolute(url: str) -> str:
+    """상대 URL 을 API 기준으로 절대화한다.
+
+    AWS 모드의 part_url 은 S3 절대 주소지만, 단일 노드 모드에서는 우리 서버의
+    상대 경로(``/api/upload/...``)다. 같은 스크립트로 두 모드를 모두 점검하려면
+    여기서 흡수해야 한다.
+    """
+    return url if url.startswith("http") else f"{API}{url}"
+
+
 def upload_via_presigned(client: httpx.Client, upload: dict, blob: bytes) -> dict:
     """브라우저가 하는 그대로 파트별 PUT. Content-Type 헤더는 붙이지 않는다.
 
@@ -55,7 +65,7 @@ def upload_via_presigned(client: httpx.Client, upload: dict, blob: bytes) -> dic
     parts = []
     for number, url in enumerate(upload["part_urls"], start=1):
         chunk = blob[(number - 1) * PART_SIZE : number * PART_SIZE]
-        response = client.put(url, content=chunk, timeout=120)
+        response = client.put(absolute(url), content=chunk, timeout=120)
         if response.status_code != 200:
             raise RuntimeError(
                 f"파트 {number} PUT 실패: {response.status_code} {response.text[:300]}"
@@ -133,7 +143,7 @@ def main() -> int:
     print("\n[7] 다운로드 — 서명 URL 로 실제 내려받기")
     signed = client.get(f"{API}/api/transfers/{code}/download/0")
     check("200 서명 URL 발급", signed.status_code == 200, signed.text[:200])
-    url = signed.json()["url"]
+    url = absolute(signed.json()["url"])
 
     fetched = client.get(url, timeout=120)
     check("S3 에서 200", fetched.status_code == 200, fetched.text[:300])

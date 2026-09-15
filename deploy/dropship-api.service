@@ -1,0 +1,47 @@
+[Unit]
+Description=Dropship API (FastAPI + uvicorn)
+After=network.target
+# 소켓 디렉터리를 먼저 만든다
+RequiresMountsFor=/var/lib/dropship
+
+[Service]
+Type=exec
+User=dropship
+Group=dropship
+
+WorkingDirectory=/opt/dropship/api
+EnvironmentFile=/etc/dropship/dropship.env
+
+# 유닉스 소켓으로 nginx 와 붙는다. TCP 포트를 열지 않으므로 방화벽이
+# 뚫려 있어도 API 에 직접 접근할 수 없다 — nginx 를 반드시 거친다.
+RuntimeDirectory=dropship
+RuntimeDirectoryMode=0750
+ExecStart=/opt/dropship/venv/bin/uvicorn app.main:app \
+    --uds /run/dropship/api.sock \
+    --workers 2 \
+    --proxy-headers \
+    --forwarded-allow-ips='*' \
+    --log-level info
+
+# nginx 가 소켓에 쓸 수 있어야 한다
+ExecStartPost=/bin/sh -c 'for i in $(seq 1 50); do [ -S /run/dropship/api.sock ] && { chown dropship:nginx /run/dropship/api.sock; chmod 660 /run/dropship/api.sock; exit 0; }; sleep 0.1; done; exit 1'
+
+Restart=always
+RestartSec=3
+
+# ── 샌드박싱 ──
+# 익명 업로드를 받는 프로세스라, 뚫렸을 때 할 수 있는 일을 최대한 줄인다.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/dropship
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

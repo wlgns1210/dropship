@@ -19,6 +19,23 @@ class Settings(BaseSettings):
 
     dropship_env: str = "local"
 
+    #: 배포 형태.
+    #:   "aws"    — S3 + DynamoDB + CloudFront + Lambda (서버리스)
+    #:   "single" — EC2 한 대. nginx + 로컬 파일시스템 + SQLite
+    #:
+    #: 두 구현을 모두 유지하는 이유: 저장소·리포지토리를 인터페이스로 갈라두었기
+    #: 때문에 라우터는 어느 쪽인지 알 필요가 없다. 도메인이 생겨 HTTPS 를 다시
+    #: 쓰고 싶어지면 이 값만 바꾸면 된다.
+    deploy_mode: str = "aws"
+
+    # ── 단일 EC2 모드 ──
+    #: 파일과 SQLite 가 놓이는 곳
+    data_dir: str = "/var/lib/dropship"
+    #: nginx 의 internal location 접두사. X-Accel-Redirect 로 넘길 때 쓴다.
+    internal_files_prefix: str = "/protected"
+    #: 업로드/다운로드 토큰 서명 키. 비우면 ip_hash_salt 를 재사용한다.
+    url_signing_key: str = ""
+
     # AWS
     aws_region: str = "ap-northeast-2"
     aws_endpoint_url: str | None = None  # LocalStack 전용. 운영에서는 None.
@@ -64,6 +81,22 @@ class Settings(BaseSettings):
     @property
     def is_local(self) -> bool:
         return self.dropship_env == "local"
+
+    @property
+    def is_single_node(self) -> bool:
+        return self.deploy_mode == "single"
+
+    @property
+    def signing_key(self) -> str:
+        return self.url_signing_key or self.ip_hash_salt
+
+    @property
+    def files_dir(self) -> Path:
+        return Path(self.data_dir) / "files"
+
+    @property
+    def sqlite_path(self) -> Path:
+        return Path(self.data_dir) / "dropship.db"
 
 
 @lru_cache

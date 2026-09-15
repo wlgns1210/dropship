@@ -21,15 +21,30 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 from app.config import Settings
-from app.services.storage import S3Storage
 
 
 class Signer(Protocol):
     def sign(self, *, key: str, filename: str, mime: str, ttl: int) -> str: ...
 
 
+class SupportsPresign(Protocol):
+    """``presign_download`` 만 있으면 된다.
+
+    구체 클래스(S3Storage)로 묶어두면 같은 일을 하는 LocalStorage 를 재사용할 수
+    없다. 실제로 그렇게 묶여 있어서 단일 노드 배포에서 다운로드가 500 으로 죽었다.
+    """
+
+    def presign_download(self, key: str, filename: str, mime: str, ttl: int) -> str: ...
+
+
 class LocalSigner:
-    def __init__(self, storage: S3Storage) -> None:
+    """저장소가 만들어 주는 URL 을 그대로 쓴다.
+
+    S3 모드에서는 presigned GET, 단일 노드 모드에서는 우리 서버의 서명 토큰 URL.
+    어느 쪽이든 "시간 제한이 걸린 일회성 주소" 라는 성질이 같다.
+    """
+
+    def __init__(self, storage: SupportsPresign) -> None:
         self._storage = storage
 
     def sign(self, *, key: str, filename: str, mime: str, ttl: int) -> str:
@@ -67,7 +82,7 @@ class CloudFrontSigner:
         return self._signer.generate_presigned_url(url, date_less_than=expires)
 
 
-def build_signer(settings: Settings, storage: S3Storage) -> Signer:
+def build_signer(settings: Settings, storage: SupportsPresign) -> Signer:
     if settings.download_signer == "cloudfront":
         return CloudFrontSigner(settings)
     return LocalSigner(storage)

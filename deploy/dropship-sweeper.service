@@ -1,0 +1,20 @@
+[Unit]
+Description=Dropship 만료 정리 (Sweeper)
+
+[Service]
+Type=oneshot
+User=dropship
+Group=dropship
+
+WorkingDirectory=/opt/dropship/api
+EnvironmentFile=/etc/dropship/dropship.env
+
+# 이것이 파일이 실제로 사라지는 주 경로다. AWS 모드의 EventBridge + Lambda 를
+# systemd 타이머로 대체한 것이고, 하는 일은 완전히 같다.
+ExecStart=/opt/dropship/venv/bin/python -m app.sweeper
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/dropship

@@ -55,10 +55,17 @@ if settings.origin_secret:
 
 app.include_router(transfers.router)
 
+if settings.is_single_node:
+    # 파트 업로드 수신과 다운로드 인가. AWS 모드에서는 S3 가 presigned URL 로
+    # 직접 처리하므로 등록하지 않는다.
+    from app.routers import local_transfer
+
+    app.include_router(local_transfer.router)
+
 
 @app.get("/api/health", tags=["meta"])
 def health() -> dict[str, str]:
-    return {"status": "ok", "env": settings.dropship_env}
+    return {"status": "ok", "env": settings.dropship_env, "mode": settings.deploy_mode}
 
 
 @app.get("/api/config", tags=["meta"])

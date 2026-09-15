@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Path, status
 from ulid import ULID
 
 from app.config import DOWNLOAD_URL_TTL, MAX_TOTAL_BYTES
-from app.deps import IpHashDep, RepositoryDep, SignerDep, StorageDep, rate_limit
+from app.deps import IpHashDep, Repo, RepositoryDep, SignerDep, Storage, StorageDep, rate_limit
 from app.schemas import (
     CompleteTransferRequest,
     CompleteTransferResponse,
@@ -20,9 +20,9 @@ from app.schemas import (
     TransferInfoResponse,
 )
 from app.services import codes
-from app.services.repository import CodeCollision, Repository
+from app.services.repository import CodeCollision
 from app.services.security import flatten_timing, is_risky, sanitize_filename
-from app.services.storage import S3Storage, build_object_key, part_count_for
+from app.services.storage import build_object_key, part_count_for
 
 router = APIRouter(prefix="/api/transfers", tags=["transfers"])
 
@@ -40,7 +40,7 @@ _GONE = HTTPException(
 )
 
 
-def _load_live_transfer(repo: Repository, code: str) -> dict[str, Any]:
+def _load_live_transfer(repo: Repo, code: str) -> dict[str, Any]:
     """수신자에게 보여줄 수 있는 상태인지 확인하고 전송을 가져온다.
 
     만료 판정은 여기서 ``expires_at`` 비교로 한다. Sweeper 가 아직 안 돌았거나
@@ -151,7 +151,7 @@ def create_transfer(
     )
 
 
-def _reserve_code(repo: Repository, **fields: Any) -> str:
+def _reserve_code(repo: Repo, **fields: Any) -> str:
     """비어 있는 코드를 찾을 때까지 재시도한다."""
     for attempt in range(_CODE_ATTEMPTS):
         code = codes.generate_code()
@@ -240,7 +240,7 @@ def complete_transfer(
 
 
 def _verify_uploads(
-    storage: S3Storage, stored: list[dict[str, Any]]
+    storage: Storage, stored: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], int]:
     """모든 객체가 실제로 존재하는지 확인하고 실제 크기로 바꿔 담는다."""
     verified: list[dict[str, Any]] = []
