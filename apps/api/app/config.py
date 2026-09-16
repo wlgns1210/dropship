@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     #: 업로드/다운로드 토큰 서명 키. 비우면 ip_hash_salt 를 재사용한다.
     url_signing_key: str = ""
 
+    #: 관리자 페이지 토큰. **비어 있으면 관리자 라우터를 아예 등록하지 않는다.**
+    #: 공개 서비스에 붙는 화면이라 "인증으로 막는다" 보다 "존재하지 않는다" 가
+    #: 안전하다. 실수로 열릴 경로 자체가 없어진다.
+    admin_token: str = ""
+
     # AWS
     aws_region: str = "ap-northeast-2"
     aws_endpoint_url: str | None = None  # LocalStack 전용. 운영에서는 None.

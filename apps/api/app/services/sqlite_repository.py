@@ -55,6 +55,14 @@ CREATE TABLE IF NOT EXISTS rate_limits (
     hits    INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (scope, ip_hash, bucket)
 );
+
+-- 관리자 화면이 읽는 운영 메모. 지금은 Sweeper 마지막 실행 기록만 쓴다.
+-- systemd 에 물어봐도 되지만, 앱이 스스로 남긴 값이어야 "돌긴 했는데 아무것도
+-- 못 지웠다" 같은 상태까지 알 수 있다.
+CREATE TABLE IF NOT EXISTS meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 
@@ -227,6 +235,88 @@ class SqliteRepository:
         except sqlite3.Error:
             connection.execute("ROLLBACK")
             raise
+
+    # ── 관리자 지표 ───────────────────────────────────────────
+
+    def stats(self) -> dict[str, Any]:
+        """관리자 화면이 쓰는 집계.
+
+        쿼리를 여러 번 던지지 않고 한 번에 모은다. 5초마다 폴링되는 화면이라
+        여기서 테이블을 여러 번 훑으면 그 자체가 부하가 된다.
+        """
+        connection = self._connect()
+        now = int(time.time())
+        today_start = now - (now % 86400)
+
+        by_status = {
+            row["status"]: row["n"]
+            for row in connection.execute(
+                "SELECT status, COUNT(*) AS n FROM transfers GROUP BY status"
+            ).fetchall()
+        }
+
+        ready = connection.execute(
+            """SELECT COUNT(*) AS n, COALESCE(SUM(total_size), 0) AS bytes,
+                      COALESCE(SUM(download_count), 0) AS downloads
+               FROM transfers WHERE status = 'ready' AND expires_at > ?""",
+            (now,),
+        ).fetchone()
+
+        today = connection.execute(
+            """SELECT COUNT(*) AS n, COALESCE(SUM(total_size), 0) AS bytes
+               FROM transfers WHERE created_at >= ?""",
+            (today_start,),
+        ).fetchone()
+
+        expiring = connection.execute(
+            "SELECT COUNT(*) AS n FROM transfers WHERE expires_at BETWEEN ? AND ?",
+            (now, now + 3600),
+        ).fetchone()
+
+        # 이미 만료됐는데 아직 안 지워진 것. 이 수가 계속 늘면 Sweeper 가
+        # 죽었다는 뜻이고, 곧 디스크가 찬다.
+        overdue = connection.execute(
+            "SELECT COUNT(*) AS n FROM transfers WHERE expires_at < ?", (now,)
+        ).fetchone()
+
+        quota_today = connection.execute(
+            """SELECT COUNT(*) AS ips, COALESCE(SUM(bytes_used), 0) AS bytes
+               FROM quotas WHERE day = ?""",
+            (datetime.now(UTC).strftime("%Y-%m-%d"),),
+        ).fetchone()
+
+        return {
+            "transfers": {
+                "ready": by_status.get("ready", 0),
+                "pending": by_status.get("pending", 0),
+                "live": ready["n"],
+                "expiring_1h": expiring["n"],
+                "overdue": overdue["n"],
+            },
+            "storage": {"tracked_bytes": ready["bytes"]},
+            "activity": {
+                "downloads_total": ready["downloads"],
+                "uploads_today": today["n"],
+                "bytes_today": today["bytes"],
+                "unique_ips_today": quota_today["ips"],
+                "quota_bytes_today": quota_today["bytes"],
+            },
+            "last_sweep": self.get_meta("last_sweep"),
+        }
+
+    def get_meta(self, key: str) -> str | None:
+        row = self._connect().execute(
+            "SELECT value FROM meta WHERE key = ?", (key,)
+        ).fetchone()
+        return row["value"] if row else None
+
+    def set_meta(self, key: str, value: str) -> None:
+        with contextlib.suppress(sqlite3.Error):
+            self._connect().execute(
+                """INSERT INTO meta (key, value) VALUES (?, ?)
+                   ON CONFLICT(key) DO UPDATE SET value = excluded.value""",
+                (key, value),
+            )
 
     # ── 정리 ──────────────────────────────────────────────────
 

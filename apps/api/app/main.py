@@ -62,6 +62,13 @@ if settings.is_single_node:
 
     app.include_router(local_transfer.router)
 
+if settings.admin_token:
+    # 토큰이 없으면 라우터가 존재하지 않는다. 설정 실수로 관리자 화면이
+    # 열려버리는 경로를 원천적으로 없앤다.
+    from app.routers import admin
+
+    app.include_router(admin.router)
+
 
 @app.get("/api/health", tags=["meta"])
 def health() -> dict[str, str]:

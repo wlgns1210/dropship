@@ -70,6 +70,7 @@ if [ ! -f "$ENV_FILE" ]; then
     say "환경 파일 생성"
     SALT=$(python3 -c 'import secrets;print(secrets.token_urlsafe(48))')
     KEY=$(python3 -c 'import secrets;print(secrets.token_urlsafe(48))')
+    ADMIN=$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')
     cat > "$ENV_FILE" <<EOF
 # Dropship 단일 EC2 설정. 이 파일은 저장소에 두지 않는다.
 DROPSHIP_ENV=production
@@ -81,6 +82,9 @@ IP_HASH_SALT=$SALT
 # 업로드/다운로드 토큰 서명 키 — 바꾸면 발급된 링크가 즉시 무효가 된다.
 URL_SIGNING_KEY=$KEY
 
+# 관리자 페이지(/admin) 토큰. 비우면 관리자 API 가 아예 등록되지 않는다.
+ADMIN_TOKEN=$ADMIN
+
 # 단일 노드에서는 CloudFront 가 없으므로 오리진 시크릿 검사를 쓰지 않는다.
 # nginx 가 유닉스 소켓으로만 붙고 API 는 포트를 열지 않아, 외부에서
 # nginx 를 건너뛸 방법 자체가 없다.
@@ -88,6 +92,7 @@ ORIGIN_SECRET=
 EOF
     chmod 640 "$ENV_FILE"
     chown root:dropship "$ENV_FILE"
+    ADMIN_CREATED=1
 else
     say "환경 파일 유지 (기존 키 보존)"
 fi
@@ -140,4 +145,20 @@ systemctl is-active nginx && echo "  nginx: 정상"
 systemctl list-timers dropship-sweeper.timer --no-pager | tail -2
 
 say "완료"
-echo "  http://$(curl -s --max-time 5 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo '<서버-IP>')"
+HOST_IP=$(curl -s --max-time 5 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo '<서버-IP>')
+echo "  http://$HOST_IP"
+
+# 기존 환경 파일에 ADMIN_TOKEN 이 없으면(이전 버전에서 올라온 경우) 채워 준다.
+if ! grep -q '^ADMIN_TOKEN=' "$ENV_FILE"; then
+    ADMIN=$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')
+    printf '\n# 관리자 페이지(/admin) 토큰\nADMIN_TOKEN=%s\n' "$ADMIN" >> "$ENV_FILE"
+    systemctl restart dropship-api.service
+    ADMIN_CREATED=1
+fi
+
+if [ "${ADMIN_CREATED:-0}" = "1" ]; then
+    echo ""
+    echo "  관리자 페이지: /admin"
+    echo "  토큰: $(grep '^ADMIN_TOKEN=' "$ENV_FILE" | cut -d= -f2-)"
+    echo "  (이 값은 $ENV_FILE 에 있습니다. 화면에서 한 번 입력하면 브라우저에 저장됩니다.)"
+fi

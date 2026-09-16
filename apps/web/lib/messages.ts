@@ -79,6 +79,59 @@ export const ko = {
       "링크를 아는 사람은 누구나 받을 수 있습니다. 민감한 파일은 보내지 마세요.",
   },
 
+  admin: {
+    title: "서버 상태",
+    updated: (text: string) => `${text} 갱신`,
+    signIn: "관리자 토큰을 입력하세요",
+    signInHint: "서버의 /etc/dropship/dropship.env 에 있는 ADMIN_TOKEN 값입니다.",
+    tokenPlaceholder: "ADMIN_TOKEN",
+    enter: "확인",
+    signOut: "토큰 지우기",
+    wrongToken: "토큰이 올바르지 않습니다.",
+    disabled: "이 서버는 관리자 기능이 꺼져 있습니다.",
+    disabledHint: "ADMIN_TOKEN 을 설정하고 서비스를 재시작하면 켜집니다.",
+    loading: "불러오는 중…",
+
+    system: "시스템",
+    memory: "메모리",
+    cpu: "CPU",
+    disk: "디스크",
+    swap: "스왑",
+    load: "부하",
+    uptime: "가동 시간",
+
+    services: "서비스",
+    serviceActive: "실행 중",
+    serviceInactive: "중지됨",
+    serviceFailed: "실패",
+    serviceUnknown: "알 수 없음",
+
+    transfers: "전송",
+    live: "유효한 링크",
+    pending: "업로드 중",
+    expiring: "1시간 내 만료",
+    overdue: "만료 후 미삭제",
+    overdueWarn: "Sweeper 가 멈췄을 수 있습니다",
+    storedFiles: "보관 파일",
+
+    activity: "오늘",
+    uploadsToday: "업로드",
+    bytesToday: "업로드 용량",
+    ipsToday: "고유 IP",
+    downloadsTotal: "누적 다운로드",
+
+    sweeper: "마지막 정리",
+    sweeperNever: "기록 없음",
+    sweeperResult: (t: number, o: number) => `전송 ${t}건 · 객체 ${o}개 삭제`,
+
+    // 미터 상태. 색만으로 읽히지 않도록 항상 이 글자를 함께 보여준다.
+    stateOk: "여유",
+    stateWarn: "주의",
+    stateHigh: "높음",
+    stateCritical: "위험",
+    unavailable: "측정 불가",
+  },
+
   expiryOptions: {
     3600: "1시간",
     21600: "6시간",

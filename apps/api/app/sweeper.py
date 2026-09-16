@@ -7,6 +7,8 @@ DynamoDB TTL 과 S3 라이프사이클은 이게 실패했을 때를 위한 백�
 안에 끝나야 하고, 못 끝낸 것은 5분 뒤에 이어서 지우면 된다.
 """
 
+import contextlib
+import json
 import logging
 import time
 from typing import Any
@@ -56,6 +58,24 @@ def sweep(now: int | None = None) -> dict[str, int]:
             purged = purge()
         except Exception:
             logger.exception("카운터 정리 실패")
+
+    # 관리자 화면이 "마지막으로 언제 돌았고 무엇을 지웠는지" 를 볼 수 있게
+    # 앱이 직접 기록한다. systemd 에 물어보면 실행 여부만 알 수 있고,
+    # "돌긴 했는데 계속 아무것도 못 지운다" 같은 상태는 보이지 않는다.
+    set_meta = getattr(repo, "set_meta", None)
+    if set_meta is not None:
+        with contextlib.suppress(Exception):
+            set_meta(
+                "last_sweep",
+                json.dumps(
+                    {
+                        "at": cutoff,
+                        "transfers": deleted_transfers,
+                        "objects": deleted_objects,
+                        "counters": purged,
+                    }
+                ),
+            )
 
     logger.info(
         "sweep 완료: 전송 %d건, 객체 %d개, 카운터 %d행 삭제",
