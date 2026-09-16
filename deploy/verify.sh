@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# 배포 후 스모크 점검.
+#
+#   bash deploy/verify.sh [기준주소]
+#
+# **상태 코드만 보지 않는다.** 이 서비스는 매칭되지 않는 경로를 전부
+# 404.html 로 돌려주면서 200 을 낸다(공유 링크를 살리기 위한 설계다).
+# 그래서 "200 이 왔다" 는 페이지가 제대로 떴다는 증거가 되지 못한다 —
+# 실제로 /admin 이 404 화면을 200 으로 돌려주는데도 점검을 통과한 적이 있다.
+# 각 페이지가 자기 내용을 담고 있는지를 본문으로 확인한다.
+set -uo pipefail
+
+BASE="${1:-http://localhost}"
+PASS=0
+FAIL=0
+
+check_body() {
+    local label="$1" path="$2" needle="$3"
+    local body
+    body=$(curl -sk --max-time 20 "$BASE$path" 2>/dev/null)
+    if printf '%s' "$body" | grep -q -- "$needle"; then
+        printf '  OK   %-28s (%s 포함)\n' "$label" "$needle"
+        PASS=$((PASS + 1))
+    else
+        printf '  FAIL %-28s (%s 없음)\n' "$label" "$needle"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+check_status() {
+    local label="$1" path="$2" expected="$3" extra="${4:-}"
+    local code
+    # shellcheck disable=SC2086
+    code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 20 $extra "$BASE$path" 2>/dev/null)
+    if [ "$code" = "$expected" ]; then
+        printf '  OK   %-28s (%s)\n' "$label" "$code"
+        PASS=$((PASS + 1))
+    else
+        printf '  FAIL %-28s (%s, 기대 %s)\n' "$label" "$code" "$expected"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+echo "점검 대상: $BASE"
+echo ""
+echo "[페이지 — 본문으로 확인]"
+check_body "업로드 화면 /"        "/"              "끌어다 놓으세요"
+
+# 관리자 화면은 클라이언트에서 그려지므로 정적 HTML 에 최종 문구("관리자 토큰")가
+# 없다. 대신 **그 페이지 전용 청크를 참조하는지**를 본다. 404 폴백이 떴다면
+# 이 경로가 HTML 에 없으므로, 이것이 정확한 판별 기준이다.
+check_body "관리자 화면 /admin"   "/admin"         "chunks/app/admin/page-"
+
+# 공유 링크 경로는 앱 셸(404.html)이 떠야 한다. 이건 의도된 동작이다.
+check_body "공유 링크 폴백"       "/oslo/123456"   "chunks/app/not-found-"
+
+# 관리자 청크가 공유 링크 폴백에는 없어야 한다. 있으면 라우팅이 뒤섞인 것이다.
+if curl -sk --max-time 20 "$BASE/oslo/123456" | grep -q "chunks/app/admin/page-"; then
+    printf '  FAIL %-28s (관리자 청크가 섞임)\n' "폴백/관리자 분리"
+    FAIL=$((FAIL + 1))
+else
+    printf '  OK   %-28s\n' "폴백/관리자 분리"
+    PASS=$((PASS + 1))
+fi
+
+echo ""
+echo "[API]"
+check_body "헬스체크"             "/api/health"    '"status":"ok"'
+check_body "설정"                 "/api/config"    "max_total_bytes"
+check_status "없는 코드는 410"    "/api/transfers/oslo/999999" "410"
+check_status "관리자 인증 필요"   "/api/admin/stats"           "401"
+
+echo ""
+echo "[보안]"
+check_status "내부 파일 경로 차단" "/protected/anything"        "200"
+check_status "조작 다운로드 토큰"  "/api/d/fake.token"          "403"
+check_status "조작 업로드 토큰"    "/api/upload/fake.token"     "403" "-X PUT"
+
+echo ""
+echo "════════════════════════════════"
+printf '통과 %d · 실패 %d\n' "$PASS" "$FAIL"
+[ "$FAIL" -eq 0 ]

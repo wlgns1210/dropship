@@ -53,10 +53,15 @@ location /_next/static/ {
 }
 
 location / {
-    # 공유 링크(/oslo/113245)는 실제 파일이 아니다. 404 대신 404.html 을
-    # 200 으로 돌려주면 Next 앱 셸이 떠서 클라이언트가 경로를 읽고 수신
-    # 화면을 그린다.
-    try_files $uri $uri/ /404.html;
+    # `$uri.html` 이 반드시 있어야 한다. Next 정적 내보내기는 /admin 페이지를
+    # `admin/index.html` 이 아니라 **`admin.html`** 로 만든다. 이 항목이 없으면
+    # /admin 요청이 아래 404.html 폴백으로 떨어져, 관리자 페이지 대신
+    # "페이지를 찾을 수 없습니다" 가 뜬다.
+    #
+    # 공유 링크(/oslo/113245)는 실제 파일이 아니다. 어느 것도 매칭되지 않으면
+    # 404.html 을 200 으로 돌려주고, Next 앱 셸이 떠서 클라이언트가 경로를
+    # 읽고 수신 화면을 그린다.
+    try_files $uri $uri.html $uri/ /404.html;
 }
 
 error_page 404 =200 /404.html;
