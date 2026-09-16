@@ -88,9 +88,17 @@ class TestCreate:
 
     def test_rejects_too_many_files(self, client: TestClient) -> None:
         response = _create(
-            client, files=[{"name": f"{i}.txt", "size": 1, "mime": ""} for i in range(21)]
+            client, files=[{"name": f"{i}.txt", "size": 1, "mime": ""} for i in range(101)]
         )
         assert response.status_code == 422
+
+    def test_accepts_the_maximum_file_count(self, client: TestClient) -> None:
+        """상한값 자체는 통과해야 한다. 경계에서 하나 어긋나는 실수를 막는다."""
+        response = _create(
+            client, files=[{"name": f"{i}.txt", "size": 1, "mime": ""} for i in range(100)]
+        )
+        assert response.status_code == 201
+        assert len(response.json()["uploads"]) == 100
 
     def test_rejects_unknown_expiry(self, client: TestClient) -> None:
         response = _create(
@@ -262,7 +270,7 @@ class TestConfigEndpoint:
         """프론트가 이 값으로 상한을 표시하므로 정책과 일치해야 한다."""
         body = client.get("/api/config").json()
         assert body["max_total_bytes"] == 1024**3
-        assert body["max_files"] == 20
+        assert body["max_files"] == 100
         assert body["expiry_choices"] == [3600, 21600, 86400, 259200, 604800]
 
 

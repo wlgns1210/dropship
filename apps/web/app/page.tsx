@@ -14,7 +14,7 @@ import { UploadCanceled, uploadAll, type UploadProgress } from "@/lib/uploader";
 /** 서버 /api/config 를 못 받았을 때 쓰는 값. 서버 정책과 같게 유지한다. */
 const FALLBACK_CONFIG: ClientConfig = {
   max_total_bytes: 1024 ** 3,
-  max_files: 20,
+  max_files: 100,
   expiry_choices: [3600, 21600, 86400, 259200, 604800],
   daily_quota_bytes: 5 * 1024 ** 3,
 };
