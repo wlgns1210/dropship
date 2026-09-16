@@ -18,6 +18,7 @@
 
 import contextlib
 import math
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import quote
@@ -149,6 +150,22 @@ class S3Storage:
         except self._client.exceptions.ClientError:
             return None
         return int(head["ContentLength"])
+
+    def open_stream(self, key: str, chunk_size: int = 1024 * 1024) -> Iterator[bytes]:
+        """S3 객체를 조각내어 읽는다. ZIP 일괄 다운로드가 쓴다.
+
+        전체를 메모리에 올리지 않도록 StreamingBody 를 그대로 흘린다.
+        """
+        response = self._client.get_object(Bucket=self._bucket, Key=key)
+        body = response["Body"]
+        try:
+            while True:
+                chunk = body.read(chunk_size)
+                if not chunk:
+                    return
+                yield chunk
+        finally:
+            body.close()
 
     def delete_objects(self, keys: list[str]) -> None:
         """DeleteObjects 는 한 번에 1000개까지라 나눠서 보낸다."""

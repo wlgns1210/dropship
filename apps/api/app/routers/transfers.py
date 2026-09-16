@@ -5,9 +5,10 @@ import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Path, status
+from fastapi.responses import StreamingResponse
 from ulid import ULID
 
-from app.config import DOWNLOAD_URL_TTL, MAX_TOTAL_BYTES
+from app.config import DOWNLOAD_URL_TTL, MAX_TOTAL_BYTES, get_settings
 from app.deps import IpHashDep, Repo, RepositoryDep, SignerDep, Storage, StorageDep, rate_limit
 from app.schemas import (
     CompleteTransferRequest,
@@ -20,12 +21,16 @@ from app.schemas import (
     PublicFile,
     TransferInfoResponse,
 )
-from app.services import codes
+from app.services import codes, local_tokens, zipstream
 from app.services.repository import CodeCollision
 from app.services.security import flatten_timing, is_risky, sanitize_filename
-from app.services.storage import build_object_key, part_count_for
+from app.services.storage import build_object_key, content_disposition, part_count_for
 
 router = APIRouter(prefix="/api/transfers", tags=["transfers"])
+
+#: ZIP 스트리밍은 /api/transfers 아래 두지 않는다. 그 아래는 ``/{word}/{number}``
+#: 패턴이 잡고 있어 토큰이 코드로 오인될 여지가 있다.
+zip_router = APIRouter(tags=["transfers"])
 
 #: 코드 충돌 시 재시도 횟수. 코드 공간이 넓어 1회 충돌도 드물다.
 _CODE_ATTEMPTS = 5
@@ -334,6 +339,82 @@ def download_file(
     repo.bump_download_count(code)
 
     return DownloadResponse(url=url, expires_in=DOWNLOAD_URL_TTL)
+
+
+# ── 전체 받기 (ZIP) ───────────────────────────────────────────
+
+
+@router.get(
+    "/{word}/{number}/download-all",
+    response_model=DownloadResponse,
+    dependencies=[rate_limit("download")],
+    summary="전체 파일을 ZIP 으로 받는 URL 발급",
+)
+def download_all(
+    repo: RepositoryDep,
+    word: str = WordPath,
+    number: str = NumberPath,
+) -> DownloadResponse:
+    """실제 스트리밍은 짧은 수명 토큰을 받은 뒤에 한다.
+
+    ZIP 만들기는 파일 전체를 읽어야 하는 비싼 작업이다. 코드만 알면 바로
+    호출할 수 있게 두면, 코드를 하나 주워낸 공격자가 그 경로만 반복해
+    서버를 묶어둘 수 있다. 여기서 코드 검증과 레이트리밋을 통과한 사람에게만
+    토큰을 주고, 스트리밍 경로는 그 토큰만 받는다.
+    """
+    code = codes.normalize_code(word, number)
+    transfer = _load_live_transfer(repo, code)
+
+    if len(transfer["files"]) < 2:
+        # 한 개짜리는 ZIP 으로 감쌀 이유가 없다. 받는 사람만 번거로워진다.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="파일이 하나뿐입니다. 개별 받기를 이용해 주세요.",
+        )
+
+    token = local_tokens.sign(
+        get_settings().signing_key, {"c": code, "z": 1}, DOWNLOAD_URL_TTL
+    )
+    return DownloadResponse(url=f"/api/zip/{token}", expires_in=DOWNLOAD_URL_TTL)
+
+
+@zip_router.get("/api/zip/{token}", summary="ZIP 스트리밍")
+def stream_all(
+    repo: RepositoryDep,
+    storage: StorageDep,
+    token: str,
+) -> StreamingResponse:
+    body = local_tokens.verify(get_settings().signing_key, token)
+    if body is None or not body.get("z") or "c" not in body:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="링크가 만료되었습니다."
+        )
+
+    # 토큰을 받은 뒤 전송이 만료되거나 삭제됐을 수 있다. 다시 확인한다.
+    transfer = _load_live_transfer(repo, str(body["c"]))
+    files = sorted(transfer["files"], key=lambda f: int(f["index"]))
+
+    names = zipstream.unique_names([str(f["name"]) for f in files])
+    entries = [
+        (name, storage.open_stream(str(record["key"])))
+        for name, record in zip(names, files, strict=True)
+    ]
+
+    repo.bump_download_count(str(body["c"]))
+
+    archive_name = str(body["c"]).replace("/", "-") + ".zip"
+    return StreamingResponse(
+        zipstream.stream_zip(entries, created_at=int(transfer["created_at"])),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": content_disposition(archive_name),
+            # 스트리밍이라 전체 크기를 미리 알 수 없다. 프록시가 버퍼링하지
+            # 않도록 명시한다 — 버퍼링되면 1GB 를 다 만들 때까지 아무것도
+            # 나가지 않는다.
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 # ── 삭제 ──────────────────────────────────────────────────────

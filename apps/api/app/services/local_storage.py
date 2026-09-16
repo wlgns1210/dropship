@@ -19,6 +19,7 @@ nginx 가 sendfile 로 직접 보낸다. 업로드는 어쩔 수 없이 지나�
 
 import os
 import shutil
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -160,6 +161,20 @@ class LocalStorage:
             return self._object_path(key).stat().st_size
         except (OSError, ValueError):
             return None
+
+    def open_stream(self, key: str, chunk_size: int = 1024 * 1024) -> Iterator[bytes]:
+        """파일을 조각내어 읽는다. ZIP 일괄 다운로드가 쓴다.
+
+        단일 파일 다운로드는 이 경로를 타지 않는다 — nginx 가 sendfile 로 직접
+        보낸다. 여러 파일을 하나로 엮을 때만 어쩔 수 없이 여기를 지난다.
+        """
+        path = self._object_path(key)
+        with path.open("rb") as handle:
+            while True:
+                chunk = handle.read(chunk_size)
+                if not chunk:
+                    return
+                yield chunk
 
     def delete_objects(self, keys: list[str]) -> None:
         for key in keys:

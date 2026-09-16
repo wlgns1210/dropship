@@ -15,6 +15,7 @@ type State =
 export function ReceiveView({ code }: { code: string }) {
   const [state, setState] = useState<State>({ status: "loading" });
   const [busyIndex, setBusyIndex] = useState<number | null>(null);
+  const [zipping, setZipping] = useState(false);
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
 
   useEffect(() => {
@@ -62,6 +63,19 @@ export function ReceiveView({ code }: { code: string }) {
     [code],
   );
 
+  const downloadAll = useCallback(async () => {
+    setZipping(true);
+    try {
+      const { url } = await api.downloadAllUrl(code);
+      window.location.href = url;
+    } catch (err) {
+      if (err instanceof ApiError && err.isGone) setState({ status: "gone" });
+      else alert(err instanceof ApiError ? err.detail : ko.errors.generic);
+    } finally {
+      setZipping(false);
+    }
+  }, [code]);
+
   if (state.status === "loading") {
     return (
       <main className="card">
@@ -108,6 +122,21 @@ export function ReceiveView({ code }: { code: string }) {
       </p>
 
       {hasRisky && <div className="notice notice-warn">{ko.receive.riskyWarning}</div>}
+
+      {/* 파일이 여러 개면 하나씩 받게 두지 않는다. 100개까지 담을 수 있으므로
+          개별 버튼만 있으면 받는 사람이 100번 눌러야 한다. */}
+      {transfer.files.length > 1 && (
+        <button
+          type="button"
+          className="btn btn-block"
+          disabled={zipping || remaining <= 0}
+          onClick={downloadAll}
+        >
+          {zipping
+            ? ko.receive.preparing
+            : `${ko.receive.downloadAll} (${transfer.files.length}개)`}
+        </button>
+      )}
 
       <ul className="filelist">
         {transfer.files.map((file) => (

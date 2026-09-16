@@ -158,6 +158,10 @@ export const api = {
       `/api/transfers/${code}/download/${index}`,
     ),
 
+  /** 파일이 여러 개일 때 ZIP 하나로 받는 URL. */
+  downloadAllUrl: (code: string) =>
+    request<{ url: string; expires_in: number }>(`/api/transfers/${code}/download-all`),
+
   deleteTransfer: (code: string, ownerToken: string) =>
     request<{ status: string }>(
       `/api/transfers/${code}?owner_token=${encodeURIComponent(ownerToken)}`,

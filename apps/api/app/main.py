@@ -62,6 +62,7 @@ if settings.origin_secret:
 
 
 app.include_router(transfers.router)
+app.include_router(transfers.zip_router)
 
 if settings.is_single_node:
     # 파트 업로드 수신과 다운로드 인가. AWS 모드에서는 S3 가 presigned URL 로

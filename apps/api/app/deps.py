@@ -10,6 +10,7 @@
 모드에서는 SQLite 커넥션과 스키마 초기화를 매 요청 반복하지 않기 위해서다.
 """
 
+from collections.abc import Iterator
 from functools import lru_cache
 from typing import Annotated, Any, Protocol
 
@@ -39,6 +40,7 @@ class Storage(Protocol):
     def object_size(self, key: str) -> int | None: ...
     def delete_objects(self, keys: list[str]) -> None: ...
     def presign_download(self, key: str, filename: str, mime: str, ttl: int) -> str: ...
+    def open_stream(self, key: str, chunk_size: int = ...) -> Iterator[bytes]: ...
 
 
 class Repo(Protocol):
