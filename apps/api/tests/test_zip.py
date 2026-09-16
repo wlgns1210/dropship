@@ -168,14 +168,24 @@ class TestDownloadAllEndpoint:
             assert archive.read("첫번째.txt") == b"body0"
             assert archive.read("세번째.txt") == b"body2"
 
-    def test_archive_filename_comes_from_the_code(self, client: TestClient) -> None:
+    def test_archive_filename_is_prefixed_and_traceable(self, client: TestClient) -> None:
+        """dropship-<코드>.zip
+
+        접두사는 다운로드 폴더에서 출처를 알려주고, 코드는 받은 파일과 공유
+        링크를 1:1 로 맞춰준다.
+        """
         from urllib.parse import unquote
 
         code = self._multi(client, ["a.txt", "b.txt"])
         url = client.get(f"/api/transfers/{code}/download-all").json()["url"]
 
         disposition = client.get(url).headers["content-disposition"]
-        assert unquote(disposition.split("''")[-1]) == code.replace("/", "-") + ".zip"
+        name = unquote(disposition.split("''")[-1])
+
+        assert name == f"dropship-{code.replace('/', '-')}.zip"
+        assert name.startswith("dropship-")
+        # 코드가 남아 있어야 어느 링크였는지 되짚을 수 있다
+        assert code.split("/")[1] in name
 
     def test_duplicate_names_are_separated_in_the_archive(self, client: TestClient) -> None:
         code = self._multi(client, ["같은이름.txt", "같은이름.txt"])

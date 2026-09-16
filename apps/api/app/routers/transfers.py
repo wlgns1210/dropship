@@ -402,7 +402,12 @@ def stream_all(
 
     repo.bump_download_count(str(body["c"]))
 
-    archive_name = str(body["c"]).replace("/", "-") + ".zip"
+    # dropship-<코드>.zip — 예: dropship-regina-123456.zip
+    #
+    # 접두사가 있으면 다운로드 폴더에 여러 개 쌓였을 때 출처가 바로 보인다.
+    # 코드를 그대로 남기는 이유는 받은 파일과 공유 링크가 1:1 로 맞아떨어져
+    # "아까 그 링크가 뭐였지" 를 ZIP 이름만으로 되짚을 수 있기 때문이다.
+    archive_name = "dropship-" + str(body["c"]).replace("/", "-") + ".zip"
     return StreamingResponse(
         zipstream.stream_zip(entries, created_at=int(transfer["created_at"])),
         media_type="application/zip",
