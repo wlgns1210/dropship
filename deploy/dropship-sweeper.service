@@ -13,6 +13,12 @@ EnvironmentFile=/etc/dropship/dropship.env
 # systemd 타이머로 대체한 것이고, 하는 일은 완전히 같다.
 ExecStart=/opt/dropship/venv/bin/python -m app.sweeper
 
+# 앱이 만드는 파일을 640, 디렉터리를 750 으로 고정한다.
+# 기본 umask(022)면 업로드 파일과 SQLite DB 가 **누구나 읽을 수 있는** 644 로
+# 만들어진다. DB 에는 owner_token(있으면 남의 전송을 지울 수 있다)과 모든
+# 파일명이 들어 있다. nginx 는 dropship 그룹에 속해 있어 640 으로도 읽는다.
+UMask=0027
+
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict

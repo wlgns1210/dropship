@@ -1,0 +1,21 @@
+# 줄바꿈을 저장소에서 LF 로 고정한다.
+#
+# 이게 없으면 Windows 에서 편집한 파일이 CRLF 로 저장되고, 리눅스 서버에서
+# 셸 스크립트가 `set -euo pipefail\r` 같은 줄을 만나 "invalid option name" 으로
+# 죽는다. 실제로 install.sh 가 7번째 줄에서 멈춰 아무 작업도 하지 않은 채
+# 성공한 것처럼 보인 적이 있다.
+#
+# systemd 유닛과 nginx 설정도 마찬가지다. CR 이 값의 일부로 해석되어
+# 경로나 옵션이 조용히 어긋난다.
+* text=auto eol=lf
+
+# 바이너리는 건드리지 않는다
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.zip binary

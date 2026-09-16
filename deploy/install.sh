@@ -30,10 +30,15 @@ dnf install -y -q nginx python3.12 python3.12-pip >/dev/null
 say "디렉터리 준비"
 mkdir -p "$APP_DIR" "$DATA_DIR/files" "$WEB_DIR" "$(dirname "$ENV_FILE")"
 chown -R dropship:dropship "$DATA_DIR"
-# nginx 가 X-Accel-Redirect 로 파일을 읽어야 한다. 다만 디렉터리 목록은
-# 열어주지 않는다(755 가 아니라 751).
-chmod 751 "$DATA_DIR" "$DATA_DIR/files"
 usermod -a -G dropship nginx
+
+# nginx 는 dropship 그룹에 속해 X-Accel-Redirect 로 파일을 읽는다.
+# 그 외 사용자에게는 아무 권한도 주지 않는다 — 업로드 파일과 SQLite DB 는
+# 남의 파일명과 owner_token 을 담고 있다.
+chmod 750 "$DATA_DIR" "$DATA_DIR/files"
+# 이전 버전이 만든 644 파일들을 바로잡는다. 여러 번 돌려도 무해하다.
+find "$DATA_DIR" -type d -exec chmod 750 {} +
+find "$DATA_DIR" -type f -exec chmod 640 {} +
 
 # ── 백엔드 ────────────────────────────────────────────────────
 say "백엔드 코드 배치"
