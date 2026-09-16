@@ -83,7 +83,8 @@ class TestLocalStorage:
 
         for number, url in enumerate(target.part_urls, start=1):
             resolved = storage.resolve_part_token(url.rsplit("/", 1)[-1])
-            assert resolved == (key, number)
+            assert resolved is not None
+            assert (resolved.key, resolved.part_number) == (key, number)
             chunk = blob[(number - 1) * PART_SIZE : number * PART_SIZE]
             path = storage.part_path(key, number)
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -306,3 +307,48 @@ class TestBothModesSatisfyTheSameContract:
             "allow_request",
         ):
             assert callable(getattr(repo, name, None)), f"SqliteRepository.{name} 없음"
+
+
+class TestPartTokenCarriesItsSizeLimit:
+    """토큰에 크기 한도가 서명되어 있어야 한다.
+
+    없으면 "1바이트짜리 파일"이라고 신고해 쿼터를 1바이트만 쓰고, 발급받은
+    파트 URL 로 8MB 를 밀어넣을 수 있다. complete 를 부르지 않으면 pending
+    으로 디스크에 그대로 남는다. 배포된 서버에서 재현됐던 취약점이다.
+    """
+
+    def test_token_encodes_declared_part_size(self, storage: LocalStorage) -> None:
+        target = storage.start_multipart(
+            key="01ABC/0", mime="", size=1, expires_in=3600, filename="tiny.bin"
+        )
+        resolved = storage.resolve_part_token(target.part_urls[0].rsplit("/", 1)[-1])
+
+        assert resolved is not None
+        assert resolved.max_bytes == 1
+
+    def test_full_parts_get_the_part_size(self, storage: LocalStorage) -> None:
+        size = PART_SIZE + 100
+        target = storage.start_multipart(
+            key="01ABC/0", mime="", size=size, expires_in=3600, filename="two-parts.bin"
+        )
+        first, second = (
+            storage.resolve_part_token(url.rsplit("/", 1)[-1]) for url in target.part_urls
+        )
+
+        assert first is not None and second is not None
+        assert first.max_bytes == PART_SIZE
+        assert second.max_bytes == 100  # 마지막 파트는 나머지만
+
+    def test_size_cannot_be_raised_by_editing_the_token(self, storage: LocalStorage) -> None:
+        """크기가 서명 안에 있으므로 고치면 서명이 깨져야 한다."""
+        target = storage.start_multipart(
+            key="01ABC/0", mime="", size=1, expires_in=3600, filename="tiny.bin"
+        )
+        token = target.part_urls[0].rsplit("/", 1)[-1]
+        _, _, signature = token.partition(".")
+
+        # 본문만 큰 크기로 바꾸고 원래 서명을 붙여 본다
+        forged_body = local_tokens.sign(
+            "other-secret", {"k": "01ABC/0", "p": 1, "s": 99_999_999}, 3600
+        ).split(".")[0]
+        assert storage.resolve_part_token(f"{forged_body}.{signature}") is None

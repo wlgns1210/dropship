@@ -15,6 +15,13 @@ probe = FastAPI()
 
 @probe.get("/whoami")
 def whoami(request: Request) -> dict[str, str]:
+    """CloudFront 뒤에 있는 구성 (AWS 모드)."""
+    return {"ip": client_ip(request, behind_cloudfront=True)}
+
+
+@probe.get("/whoami-single")
+def whoami_single(request: Request) -> dict[str, str]:
+    """CloudFront 가 없는 구성 (단일 EC2). 전용 헤더를 믿으면 안 된다."""
     return {"ip": client_ip(request)}
 
 
@@ -92,3 +99,51 @@ class TestQuotaIsolation:
 
         salt = get_settings().ip_hash_salt
         assert hash_ip("203.0.113.9", salt) != hash_ip("203.0.113.10", salt)
+
+
+class TestCloudFrontHeaderIsOnlyTrustedBehindCloudFront:
+    """이 헤더는 CloudFront 가 덮어써 주기 때문에만 안전하다.
+
+    CloudFront 가 없는 단일 EC2 에서는 nginx 가 클라이언트의 동명 헤더를 그대로
+    통과시키므로, 믿으면 헤더 하나로 레이트리밋과 일일 쿼터가 통째로 우회된다.
+    실제로 배포된 서버에서 재현됐던 취약점이다.
+    """
+
+    def test_single_node_ignores_the_header(self, probe_client: TestClient) -> None:
+        response = probe_client.get(
+            "/whoami-single",
+            headers={
+                "cloudfront-viewer-address": "203.0.113.9:44321",
+                "x-forwarded-for": "198.51.100.1",
+            },
+        )
+        # 위조된 CloudFront 헤더가 아니라 프록시가 붙인 XFF 를 써야 한다
+        assert response.json()["ip"] == "198.51.100.1"
+
+    def test_single_node_falls_back_to_socket(self, probe_client: TestClient) -> None:
+        response = probe_client.get(
+            "/whoami-single", headers={"cloudfront-viewer-address": "203.0.113.9:44321"}
+        )
+        assert response.json()["ip"] == "testclient"
+
+    def test_forged_header_cannot_mint_new_identities(self, probe_client: TestClient) -> None:
+        """매 요청 다른 값을 보내도 신원이 갈리지 않아야 한다."""
+        seen = {
+            probe_client.get(
+                "/whoami-single",
+                headers={"cloudfront-viewer-address": f"203.0.113.{i}:5000"},
+            ).json()["ip"]
+            for i in range(10)
+        }
+        assert len(seen) == 1
+
+    def test_behind_cloudfront_still_uses_the_header(self, probe_client: TestClient) -> None:
+        """AWS 모드에서는 여전히 이 헤더가 가장 믿을 만한 값이다."""
+        response = probe_client.get(
+            "/whoami",
+            headers={
+                "cloudfront-viewer-address": "203.0.113.9:44321",
+                "x-forwarded-for": "1.2.3.4",
+            },
+        )
+        assert response.json()["ip"] == "203.0.113.9"

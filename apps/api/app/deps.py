@@ -114,7 +114,12 @@ SignerDep = Annotated[Any, Depends(get_signer)]
 
 
 def get_ip_hash(request: Request, settings: SettingsDep) -> str:
-    return hash_ip(client_ip(request), settings.ip_hash_salt)
+    # CloudFront 전용 헤더는 실제로 CloudFront 뒤에 있을 때만 믿는다.
+    # 단일 노드에서는 그 헤더를 클라이언트가 직접 채워 보낼 수 있다.
+    return hash_ip(
+        client_ip(request, behind_cloudfront=not settings.is_single_node),
+        settings.ip_hash_salt,
+    )
 
 
 IpHashDep = Annotated[str, Depends(get_ip_hash)]

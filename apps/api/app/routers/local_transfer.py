@@ -37,12 +37,16 @@ _BAD_TOKEN = HTTPException(
 async def upload_part(token: str, request: Request, storage: StorageDep) -> Response:
     assert isinstance(storage, LocalStorage)
 
-    resolved = storage.resolve_part_token(token)
-    if resolved is None:
+    target = storage.resolve_part_token(token)
+    if target is None:
         raise _BAD_TOKEN
-    key, part_number = resolved
 
-    destination = storage.part_path(key, part_number)
+    # 토큰에 서명된 크기를 상한으로 쓴다. 전역 상한(PART_SIZE)만 쓰면
+    # "1바이트짜리"라고 신고하고 8MB 를 밀어넣어 쿼터를 우회할 수 있다.
+    # 0바이트 파일도 있으므로 최솟값을 두되, 여유는 최소한으로 잡는다.
+    limit = min(_MAX_PART_BYTES, max(target.max_bytes, 1024))
+
+    destination = storage.part_path(target.key, target.part_number)
     destination.parent.mkdir(parents=True, exist_ok=True)
 
     # S3 처럼 ETag 를 돌려준다. 프론트의 uploader.ts 가 이 값을 읽어 확정 요청에
@@ -57,10 +61,10 @@ async def upload_part(token: str, request: Request, storage: StorageDep) -> Resp
         with temporary.open("wb") as handle:
             async for chunk in request.stream():
                 written += len(chunk)
-                if written > _MAX_PART_BYTES:
+                if written > limit:
                     raise HTTPException(
                         status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                        detail="파트 크기가 허용치를 넘습니다.",
+                        detail="파트 크기가 신고한 크기를 넘습니다.",
                     )
                 digest.update(chunk)
                 handle.write(chunk)

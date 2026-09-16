@@ -1,5 +1,6 @@
 """전송 생성 · 확정 · 조회 · 다운로드 · 삭제."""
 
+import secrets
 import time
 from typing import Any
 
@@ -189,7 +190,9 @@ def complete_transfer(
     if transfer is None or transfer.get("status") != "pending":
         raise _GONE
     # 토큰 비교는 mark_ready 의 조건부 업데이트에서 원자적으로 한 번 더 한다.
-    if payload.owner_token != transfer.get("owner_token"):
+    # compare_digest 를 쓰는 이유는 일반 비교가 앞에서부터 다르면 즉시 끝나
+    # 응답 시간으로 토큰을 한 글자씩 좁혀갈 여지를 주기 때문이다.
+    if not secrets.compare_digest(payload.owner_token, str(transfer.get("owner_token", ""))):
         raise _GONE
 
     stored: list[dict[str, Any]] = transfer["files"]

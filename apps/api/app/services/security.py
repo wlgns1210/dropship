@@ -16,13 +16,19 @@ from app.config import MAX_FILENAME_LEN, RISKY_EXTENSIONS
 _MIN_LOOKUP_SECONDS = 0.08
 
 
-def client_ip(request: Request) -> str:
+def client_ip(request: Request, *, behind_cloudfront: bool = False) -> str:
     """레이트리밋·쿼터의 기준이 될, **위조할 수 없는** 클라이언트 IP.
 
     여기를 틀리면 익명 서비스의 방어가 통째로 무너지므로 순서가 중요하다.
 
-    1. ``CloudFront-Viewer-Address`` — CloudFront 가 직접 채우는 헤더다. 뷰어가
-       같은 이름으로 보내도 CloudFront 가 덮어쓰기 때문에 위조할 수 없다.
+    1. ``CloudFront-Viewer-Address`` — **CloudFront 뒤에 있을 때만** 본다.
+       CloudFront 가 이 헤더를 직접 채우고 뷰어가 보낸 동명 헤더를 덮어쓰기
+       때문에 그 구성에서는 위조할 수 없다.
+
+       그러나 단일 EC2 처럼 CloudFront 가 없는 구성에서는 nginx 가 이 헤더를
+       그대로 통과시키므로, 클라이언트가 직접 채워 보내면 그대로 믿게 된다.
+       실제로 이 헤더 하나로 레이트리밋과 일일 쿼터가 통째로 우회됐다.
+       그래서 배포 형태를 인자로 받아, 믿을 수 있는 구성에서만 읽는다.
 
     2. ``X-Forwarded-For`` 의 **마지막** 값 — 첫 번째가 아니다. CloudFront 는
        뷰어가 보낸 XFF 를 지우지 않고 뒤에 실제 IP 를 덧붙인다. 그래서 첫 번째
@@ -35,9 +41,10 @@ def client_ip(request: Request) -> str:
     이 함수가 신뢰할 수 있으려면 Lambda 함수 URL 이 CloudFront 를 거치지 않고는
     호출될 수 없어야 한다. 그 통제는 ``app.main`` 의 오리진 시크릿 검사가 한다.
     """
-    viewer = request.headers.get("cloudfront-viewer-address")
-    if viewer:
-        return _strip_port(viewer.strip())
+    if behind_cloudfront:
+        viewer = request.headers.get("cloudfront-viewer-address")
+        if viewer:
+            return _strip_port(viewer.strip())
 
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:

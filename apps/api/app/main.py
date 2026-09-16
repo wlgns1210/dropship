@@ -22,6 +22,14 @@ app = FastAPI(
     title="Dropship API",
     description="익명 파일 전송 — 링크와 QR로 보내고, 정해진 기간이 지나면 사라진다",
     version="0.1.0",
+    # 운영에서는 자동 문서를 끈다. 관리자 엔드포인트를 포함한 전체 API 구조와
+    # 스키마가 그대로 노출되기 때문이다.
+    #
+    # 지금은 nginx 가 /api/* 만 프록시해서 /docs 가 어차피 닿지 않지만, 그건
+    # 라우팅 설정에 기댄 우연이다. 나중에 프록시 범위가 넓어지면 조용히 열린다.
+    docs_url="/docs" if settings.is_local else None,
+    redoc_url="/redoc" if settings.is_local else None,
+    openapi_url="/openapi.json" if settings.is_local else None,
 )
 
 # 운영에서는 CloudFront 가 프론트와 API 를 같은 도메인으로 묶으므로 CORS 가 필요 없다.

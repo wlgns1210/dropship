@@ -28,6 +28,16 @@ from app.services.storage import MultipartTarget, content_disposition, part_coun
 
 
 @dataclass(frozen=True)
+class PartTarget:
+    """파트 업로드 토큰이 허가하는 범위."""
+
+    key: str
+    part_number: int
+    #: 이 파트가 받을 수 있는 최대 바이트. 세션 생성 시 선언한 크기에서 나온다.
+    max_bytes: int
+
+
+@dataclass(frozen=True)
 class ResolvedFile:
     """토큰이 가리키는 실제 파일."""
 
@@ -69,6 +79,18 @@ class LocalStorage:
         parts_dir.mkdir(parents=True, exist_ok=True)
 
         url_ttl = min(expires_in, 12 * 3600)
+
+        # 토큰에 **그 파트가 받을 수 있는 최대 바이트**를 함께 서명한다.
+        #
+        # 이게 없으면 "1바이트짜리 파일"이라고 신고해 쿼터를 1바이트만 쓰고,
+        # 발급받은 파트 URL 로 8MB 를 밀어넣을 수 있다. complete 를 부르지
+        # 않으면 pending 상태로 디스크에 그대로 남는다. 실제로 재현됐다.
+        #
+        # 크기가 토큰 안에 서명되어 있으므로 클라이언트가 고칠 수 없고,
+        # 업로드된 실제 양은 항상 쿼터에 반영된 선언량 이하가 된다.
+        def part_bytes(number: int) -> int:
+            return max(0, min(PART_SIZE, size - (number - 1) * PART_SIZE))
+
         # 경로를 /api/transfers/ 아래 두지 않는다. 그 아래는 ``/{word}/{number}``
         # 패턴이 잡고 있어서 라우트 우선순위를 따져야 하는데, 별도 접두사를 쓰면
         # 그런 미묘함이 아예 생기지 않는다.
@@ -76,7 +98,7 @@ class LocalStorage:
             "/api/upload/"
             + local_tokens.sign(
                 self._secret,
-                {"k": key, "p": number, "n": filename, "m": mime},
+                {"k": key, "p": number, "n": filename, "m": mime, "s": part_bytes(number)},
                 url_ttl,
             )
             for number in range(1, part_count_for(size) + 1)
@@ -86,12 +108,18 @@ class LocalStorage:
             key=key, upload_id="local", part_size=PART_SIZE, part_urls=part_urls
         )
 
-    def resolve_part_token(self, token: str) -> tuple[str, int] | None:
-        """파트 업로드 토큰을 (key, part_number) 로 푼다."""
+    def resolve_part_token(self, token: str) -> PartTarget | None:
+        """파트 업로드 토큰을 검증하고 대상과 크기 한도를 돌려준다."""
         body = local_tokens.verify(self._secret, token)
         if body is None or "k" not in body or "p" not in body:
             return None
-        return str(body["k"]), int(body["p"])
+        return PartTarget(
+            key=str(body["k"]),
+            part_number=int(body["p"]),
+            # 크기가 없는 토큰은 이 방어가 들어오기 전에 발급된 것이다.
+            # 남은 유효기간(최대 12시간) 동안만 존재하며, 그때는 전역 상한을 쓴다.
+            max_bytes=int(body["s"]) if "s" in body else PART_SIZE,
+        )
 
     def part_path(self, key: str, part_number: int) -> Path:
         return self._parts_dir(key) / f"{part_number:05d}"
