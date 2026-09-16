@@ -4,13 +4,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Meter } from "@/components/admin/Meter";
 import { Tile } from "@/components/admin/Tile";
+import { TransferTable } from "@/components/admin/TransferTable";
 import {
   type AdminStats,
+  deleteTransfer,
   fetchStats,
+  fetchTransfers,
   formatClock,
   formatUptime,
   serviceLook,
   tokenStore,
+  type TransferPage,
 } from "@/lib/admin";
 import { formatBytes } from "@/lib/format";
 import { ko } from "@/lib/messages";
@@ -126,21 +130,53 @@ export default function AdminPage() {
     );
   }
 
-  return <Dashboard stats={view.stats} error={view.error} onSignOut={signOut} />;
+  return (
+    <Dashboard
+      stats={view.stats}
+      error={view.error}
+      onSignOut={signOut}
+      token={tokenRef.current ?? ""}
+    />
+  );
 }
 
 function Dashboard({
   stats,
   error,
   onSignOut,
+  token,
 }: {
   stats: AdminStats;
   error?: string;
   onSignOut: () => void;
+  token: string;
 }) {
   const { system, disk, files, services, transfers, activity, storage } = stats;
   const memory = system.memory;
   const sweep = stats.last_sweep;
+
+  const [page, setPage] = useState<TransferPage | null>(null);
+  const [limit, setLimit] = useState(25);
+
+  // 목록은 지표와 따로 가져온다. 파일명·공유 코드가 담겨 오는 민감한 응답이라
+  // 5초 폴링에 섞지 않고, 화면에 들어올 때와 변경이 있을 때만 부른다.
+  const reloadList = useCallback(async () => {
+    if (!token) return;
+    setPage(await fetchTransfers(token, { limit }));
+  }, [token, limit]);
+
+  useEffect(() => {
+    void reloadList();
+  }, [reloadList]);
+
+  const removeTransfer = useCallback(
+    async (code: string) => {
+      const ok = await deleteTransfer(token, code);
+      if (ok) await reloadList();
+      return ok;
+    },
+    [token, reloadList],
+  );
 
   return (
     <main className="admin-shell">
@@ -265,6 +301,20 @@ function Dashboard({
             <Tile label={ko.admin.ipsToday} value={activity.unique_ips_today} />
             <Tile label={ko.admin.downloadsTotal} value={activity.downloads_total} />
           </div>
+        </section>
+      )}
+
+      {/* ── 업로드 목록 ── 항목이 많고 각각 의미가 있어 표가 맞다 */}
+      {page && (
+        <section className="admin-section">
+          <h2>{ko.admin.list}</h2>
+          <TransferTable
+            rows={page.items}
+            total={page.total}
+            now={system.now}
+            onDelete={removeTransfer}
+            onLoadMore={() => setLimit((current) => current + 25)}
+          />
         </section>
       )}
     </main>

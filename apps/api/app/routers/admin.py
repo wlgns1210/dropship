@@ -18,11 +18,11 @@ import json
 import secrets
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, status
 
 from app.config import DAILY_QUOTA_BYTES, MAX_TOTAL_BYTES, get_settings
-from app.deps import IpHashDep, RepositoryDep, rate_limit
-from app.services import system_stats
+from app.deps import IpHashDep, RepositoryDep, StorageDep, rate_limit
+from app.services import codes, system_stats
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -100,6 +100,67 @@ async def stats(repo: RepositoryDep) -> dict[str, Any]:
         payload |= collected
 
     return payload
+
+
+# ── 전송 목록 · 삭제 ──────────────────────────────────────────
+#
+# 위의 /stats 와 달리 여기서는 **파일명과 공유 코드가 나간다.** 신고를 받았을 때
+# 어떤 전송인지 찾아 지우려면 피할 수 없다. 대신 경로를 분리해 두어, 지표만
+# 필요한 경우에 민감 정보가 따라 나가지 않게 했다.
+#
+# 업로더는 IP 해시의 앞 8자만 보여준다. 같은 사람이 반복해서 올리는지는
+# 판단할 수 있으면서 원본 IP 는 복원되지 않는다.
+
+
+@router.get("/transfers", dependencies=[AdminOnly], summary="업로드된 전송 목록")
+def list_transfers(
+    repo: RepositoryDep,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    status_filter: Annotated[str | None, Query(alias="status")] = None,
+) -> dict[str, Any]:
+    lister = getattr(repo, "list_transfers", None)
+    if lister is None:
+        # AWS 모드에서는 전체 목록을 뽑으려면 테이블 스캔이 필요해 제공하지 않는다.
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="이 배포 형태에서는 목록 조회를 지원하지 않습니다.",
+        )
+
+    if status_filter not in (None, "ready", "pending"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="status 값이 올바르지 않습니다."
+        )
+
+    result: dict[str, Any] = lister(limit=limit, offset=offset, status=status_filter)
+    return result
+
+
+@router.delete(
+    "/transfers/{word}/{number}", dependencies=[AdminOnly], summary="전송 강제 삭제"
+)
+def force_delete(
+    repo: RepositoryDep,
+    storage: StorageDep,
+    word: str = Path(pattern=r"^[a-z]{3,12}$"),
+    number: str = Path(pattern=r"^[0-9]{6}$"),
+) -> dict[str, str]:
+    """소유자 토큰 없이 지운다. 신고 대응용이다.
+
+    파일을 먼저 지우고 레코드를 지운다. 순서가 반대면 레코드만 사라지고 파일이
+    디스크에 영원히 남는다 — 목록에서도 안 보이므로 찾을 방법이 없어진다.
+    """
+    code = codes.normalize_code(word, number)
+    transfer = repo.get_transfer(code)
+    if transfer is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="없는 코드입니다.")
+
+    keys = [f["key"] for f in transfer.get("files", []) if f.get("key")]
+    if keys:
+        storage.delete_objects(keys)
+    repo.delete_transfer(code)
+
+    return {"status": "deleted", "code": code}
 
 
 @router.get("/ping", dependencies=[rate_limit("lookup")], summary="관리자 기능 활성 여부")

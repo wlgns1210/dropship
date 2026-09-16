@@ -124,6 +124,29 @@ export const ko = {
     sweeperNever: "기록 없음",
     sweeperResult: (t: number, o: number) => `전송 ${t}건 · 객체 ${o}개 삭제`,
 
+    list: "업로드 목록",
+    listEmpty: "업로드된 전송이 없습니다.",
+    colCode: "코드",
+    colFiles: "파일",
+    colSize: "크기",
+    colExpires: "만료",
+    colDownloads: "받음",
+    colUploader: "업로더",
+    colAction: "",
+    statusReady: "유효",
+    statusPending: "업로드 중",
+    expired: "만료됨",
+    filterAll: "전체",
+    more: "더 보기",
+    showing: (shown: number, total: number) => `${total}건 중 ${shown}건`,
+    deleteOne: "삭제",
+    deleting: "삭제 중…",
+    deleteConfirm: (code: string) =>
+      `${code} 를 삭제할까요?
+파일이 즉시 지워지고 링크가 죽습니다. 되돌릴 수 없습니다.`,
+    deleteFailed: "삭제하지 못했습니다.",
+    moreFiles: (n: number) => `외 ${n}개`,
+
     // 미터 상태. 색만으로 읽히지 않도록 항상 이 글자를 함께 보여준다.
     stateOk: "여유",
     stateWarn: "주의",

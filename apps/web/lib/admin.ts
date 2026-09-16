@@ -43,6 +43,25 @@ export interface AdminStats {
   last_sweep?: { at: number; transfers: number; objects: number; counters: number } | null;
 }
 
+export interface TransferRow {
+  code: string;
+  status: string;
+  total_size: number;
+  created_at: number;
+  expires_at: number;
+  download_count: number;
+  /** IP 해시의 앞 8자. 원본 IP 는 복원되지 않는다. */
+  uploader: string;
+  files: { index: number; name: string; size: number; mime: string }[];
+}
+
+export interface TransferPage {
+  items: TransferRow[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
 export type FetchResult =
   | { kind: "ok"; stats: AdminStats }
   | { kind: "unauthorized" }
@@ -93,6 +112,44 @@ export async function fetchStats(token: string): Promise<FetchResult> {
   if (!response.ok) return { kind: "error", message: `HTTP ${response.status}` };
 
   return { kind: "ok", stats: (await response.json()) as AdminStats };
+}
+
+/**
+ * 업로드된 전송 목록.
+ *
+ * **여기에는 파일명과 공유 코드가 담겨 온다.** 지표 조회(fetchStats)와 달리
+ * 민감하므로 화면에서도 필요할 때만 부른다.
+ */
+export async function fetchTransfers(
+  token: string,
+  options: { limit?: number; status?: string } = {},
+): Promise<TransferPage | null> {
+  const params = new URLSearchParams({ limit: String(options.limit ?? 50) });
+  if (options.status) params.set("status", options.status);
+
+  try {
+    const response = await fetch(`${BASE}/api/admin/transfers?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as TransferPage;
+  } catch {
+    return null;
+  }
+}
+
+/** 관리자 강제 삭제. 소유자 토큰 없이 지운다. */
+export async function deleteTransfer(token: string, code: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${BASE}/api/admin/transfers/${code}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 /**

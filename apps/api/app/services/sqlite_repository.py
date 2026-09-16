@@ -304,6 +304,62 @@ class SqliteRepository:
             "last_sweep": self.get_meta("last_sweep"),
         }
 
+    def list_transfers(
+        self, *, limit: int = 50, offset: int = 0, status: str | None = None
+    ) -> dict[str, Any]:
+        """관리자 목록용. 최신순.
+
+        여기서 나가는 값에는 **파일명과 공유 코드가 들어 있다.** 신고 대응에
+        필요한 정보지만, 지표 엔드포인트와 달리 민감하므로 라우터를 분리해
+        두었다. 업로더는 IP 해시의 앞 8자만 내보낸다 — 같은 사람이 반복해
+        올리는지는 볼 수 있으면서 원본 IP 는 복원되지 않는다.
+        """
+        connection = self._connect()
+        where = "WHERE status = ?" if status else ""
+        params: tuple[Any, ...] = (status,) if status else ()
+
+        total = connection.execute(
+            f"SELECT COUNT(*) AS n FROM transfers {where}", params
+        ).fetchone()["n"]
+
+        rows = connection.execute(
+            # transfer_id 를 보조 정렬 키로 쓴다. created_at 은 초 단위라 같은 초에
+            # 만들어진 전송끼리는 순서가 정해지지 않고, 그러면 목록이 새로고침마다
+            # 뒤바뀐다. ULID 는 밀리초 정밀도로 사전순 정렬되도록 설계돼 있어
+            # 별도 컬럼 없이 그대로 쓸 수 있다.
+            f"""SELECT code, status, files, total_size, created_at, expires_at,
+                       download_count, creator_ip_hash
+                FROM transfers {where}
+                ORDER BY created_at DESC, transfer_id DESC LIMIT ? OFFSET ?""",
+            (*params, limit, offset),
+        ).fetchall()
+
+        items = []
+        for row in rows:
+            files = json.loads(row["files"])
+            items.append(
+                {
+                    "code": row["code"],
+                    "status": row["status"],
+                    "total_size": row["total_size"],
+                    "created_at": row["created_at"],
+                    "expires_at": row["expires_at"],
+                    "download_count": row["download_count"],
+                    "uploader": row["creator_ip_hash"][:8],
+                    "files": [
+                        {
+                            "index": f["index"],
+                            "name": f["name"],
+                            "size": f["size"],
+                            "mime": f.get("mime", ""),
+                        }
+                        for f in files
+                    ],
+                }
+            )
+
+        return {"items": items, "total": total, "offset": offset, "limit": limit}
+
     def get_meta(self, key: str) -> str | None:
         row = self._connect().execute(
             "SELECT value FROM meta WHERE key = ?", (key,)
