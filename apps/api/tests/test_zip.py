@@ -168,24 +168,24 @@ class TestDownloadAllEndpoint:
             assert archive.read("첫번째.txt") == b"body0"
             assert archive.read("세번째.txt") == b"body2"
 
-    def test_archive_filename_is_prefixed_and_traceable(self, client: TestClient) -> None:
-        """dropship-<코드>.zip
+    def test_archive_filename_is_prefixed_without_the_word(self, client: TestClient) -> None:
+        """dropship-<숫자>.zip
 
-        접두사는 다운로드 폴더에서 출처를 알려주고, 코드는 받은 파일과 공유
-        링크를 1:1 로 맞춰준다.
+        접두사는 다운로드 폴더에서 출처를 알려준다. 코드의 앞 단어(도시명)는
+        링크를 부르기 쉽게 하려고 붙인 것일 뿐 뜻이 없어서, 파일명에 남기면
+        받는 사람에게는 정체 모를 단어로만 보인다.
         """
         from urllib.parse import unquote
 
         code = self._multi(client, ["a.txt", "b.txt"])
+        word, number = code.split("/")
         url = client.get(f"/api/transfers/{code}/download-all").json()["url"]
 
         disposition = client.get(url).headers["content-disposition"]
         name = unquote(disposition.split("''")[-1])
 
-        assert name == f"dropship-{code.replace('/', '-')}.zip"
-        assert name.startswith("dropship-")
-        # 코드가 남아 있어야 어느 링크였는지 되짚을 수 있다
-        assert code.split("/")[1] in name
+        assert name == f"dropship-{number}.zip"
+        assert word not in name
 
     def test_duplicate_names_are_separated_in_the_archive(self, client: TestClient) -> None:
         code = self._multi(client, ["같은이름.txt", "같은이름.txt"])
