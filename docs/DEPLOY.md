@@ -75,6 +75,9 @@
 
 저장소를 받을 필요 없다. **파일 두 개면 된다.**
 
+아래 절차는 빈 디렉터리에서 그대로 따라 실행해 확인했다 — 스모크 11개와
+실제 12MiB 왕복(업로드 · 다운로드 · 한글 파일명 · 소유자 삭제)이 통과한다.
+
 이미지는 main 에 푸시될 때마다 GitHub Container Registry 로 올라간다
 (`.github/workflows/image.yml`).
 
@@ -215,13 +218,17 @@ echo "<TOKEN>" | docker login ghcr.io -u <owner> --password-stdin
 는 페이지가 제대로 떴다는 증거가 되지 못한다 — 실제로 `/admin` 이 404 화면을
 200 으로 돌려주는데도 점검을 통과한 적이 있다.
 
-본문까지 확인하는 스모크 스크립트가 있다.
+본문까지 확인하는 스모크 스크립트가 있다. 저장소를 받지 않는 배포라
+이것도 따로 내려받는다.
 
 ```bash
-bash deploy/verify.sh http://<주소>
+curl -O https://raw.githubusercontent.com/<owner>/skiff/main/deploy/verify.sh
+bash verify.sh http://<주소>
 ```
 
-업로드부터 삭제까지 실제로 왕복시키려면:
+11개 항목이 전부 OK 여야 한다.
+
+업로드부터 삭제까지 실제로 왕복시키려면 (저장소가 있는 곳에서, `httpx` 필요):
 
 ```bash
 SKIFF_API=http://<주소> python scripts/e2e_check.py
