@@ -1,0 +1,51 @@
+# 빌드 컨텍스트에서 제외할 것.
+#
+# 이미지 크기보다 **비밀값 유출**이 더 중요한 이유다. .env 가 컨텍스트에
+# 들어가면 COPY . 한 줄로 이미지 레이어에 박히고, 이미지를 받은 사람은
+# 누구나 꺼내 볼 수 있다.
+
+# 비밀값
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# 의존성 — 이미지 안에서 다시 설치한다.
+# 호스트의 node_modules 를 그대로 넣으면 플랫폼이 달라 깨지기도 한다.
+node_modules
+**/node_modules
+.venv
+**/.venv
+__pycache__
+**/__pycache__
+*.pyc
+
+# 빌드 산출물
+.next
+**/.next
+out
+**/out
+build
+cdk.out
+**/cdk.out
+
+# 로컬 상태
+.localstack
+*.db
+*.db-wal
+*.db-shm
+
+# 버전 관리·에디터
+.git
+.github
+.gitignore
+.gitattributes
+.idea
+.vscode
+
+# 테스트·문서 — 런타임에 필요 없다
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+docs

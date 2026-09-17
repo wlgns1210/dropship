@@ -4,7 +4,7 @@
 # 매일 쓰는 것:   make dev-api  /  make dev-web
 
 .DEFAULT_GOAL := help
-.PHONY: help setup up down bootstrap dev-api dev-web sweep test e2e lint fmt typecheck build gen-api clean
+.PHONY: help setup up down bootstrap dev-api dev-web sweep test e2e lint fmt typecheck build gen-api clean image app-up app-down app-logs
 
 PY := python
 VENV := .venv
@@ -28,6 +28,12 @@ help:
 	@echo "typecheck  mypy + tsc"
 	@echo "build      프론트 정적 빌드 (apps/web/out)"
 	@echo "gen-api    OpenAPI -> TypeScript 타입 생성"
+	@echo ""
+	@echo "── 컨테이너 배포 ──"
+	@echo "image      Docker 이미지 빌드 (api, web)"
+	@echo "app-up     컨테이너로 기동 (.env 필요)"
+	@echo "app-down   컨테이너 정지"
+	@echo "app-logs   컨테이너 로그"
 
 setup:
 	$(PY) -m venv $(VENV)
@@ -37,11 +43,11 @@ setup:
 	@echo "완료. .env.example 을 .env 로 복사한 뒤 make up && make bootstrap"
 
 up:
-	docker compose up -d
+	docker compose -f docker-compose.localstack.yml up -d
 	@echo "LocalStack 기동 중… 준비되면 make bootstrap"
 
 down:
-	docker compose down
+	docker compose -f docker-compose.localstack.yml down
 
 bootstrap:
 	$(VENV_PY) scripts/bootstrap_local.py
@@ -78,6 +84,20 @@ build:
 
 gen-api:
 	node scripts/gen-api-types.mjs
+
+# ── 컨테이너 배포 ──
+image:
+	docker build -f docker/api.Dockerfile -t skiff-api:latest .
+	docker build -f docker/web.Dockerfile -t skiff-web:latest .
+
+app-up:
+	docker compose up -d --build
+
+app-down:
+	docker compose down
+
+app-logs:
+	docker compose logs -f --tail=100
 
 clean:
 	rm -rf apps/web/.next apps/web/out .localstack

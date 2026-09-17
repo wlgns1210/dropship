@@ -38,7 +38,12 @@ def admin_client(
         with TestClient(app.main.app) as client:
             yield client
     finally:
-        for name in ("ADMIN_TOKEN", "DEPLOY_MODE", "DATA_DIR", "URL_SIGNING_KEY"):
+        # delenv 로 지우면 안 된다. 지우는 순간 개발자의 .env 값이 다시
+        # 드러나서, conftest 가 맞춰둔 상태가 무너지고 뒤따르는 테스트가 깨진다.
+        # conftest 가 세운 기본값으로 되돌린다.
+        monkeypatch.setenv("ADMIN_TOKEN", "")
+        monkeypatch.setenv("DEPLOY_MODE", "aws")
+        for name in ("DATA_DIR", "URL_SIGNING_KEY"):
             monkeypatch.delenv(name, raising=False)
         app.config.get_settings.cache_clear()
         importlib.reload(app.main)

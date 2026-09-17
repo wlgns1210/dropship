@@ -1,0 +1,91 @@
+# Skiff — 컨테이너 배포
+#
+#   cp docker/env.example .env   # 비밀값을 채운다
+#   docker compose up -d --build
+#
+# 호스트 배포(deploy/install.sh)와 같은 구성을 컨테이너로 옮긴 것이다.
+# nginx + uvicorn + 로컬 파일 + SQLite + 주기적 정리.
+#
+# LocalStack 개발 환경은 docker-compose.localstack.yml 에 따로 있다.
+
+name: skiff
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    image: skiff-api:latest
+    restart: unless-stopped
+    # 호스트에 포트를 열지 않는다. compose 내부 네트워크에서 web 만 접근한다 —
+    # 호스트 배포에서 유닉스 소켓이 하던 역할과 같다.
+    expose:
+      - "8000"
+    environment:
+      SKIFF_ENV: production
+      DEPLOY_MODE: single
+      DATA_DIR: /var/lib/skiff
+      # 이 셋은 .env 에서 온다. 비어 있으면 앱이 뜨긴 하지만 링크 서명이
+      # 예측 가능해지고 관리자 페이지가 꺼진다.
+      IP_HASH_SALT: ${IP_HASH_SALT:?IP_HASH_SALT 가 필요합니다. docker/env.example 참고}
+      URL_SIGNING_KEY: ${URL_SIGNING_KEY:?URL_SIGNING_KEY 가 필요합니다}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      # 단일 노드에서는 nginx 를 건너뛸 방법이 없으므로 쓰지 않는다.
+      ORIGIN_SECRET: ""
+    volumes:
+      - data:/var/lib/skiff
+    healthcheck:
+      # localhost 가 아니라 127.0.0.1 이다. 컨테이너 안에서 localhost 가
+      # ::1 로 풀리는데 uvicorn 은 0.0.0.0(IPv4)에만 붙어 있어
+      # "Cannot assign requested address" 로 헬스체크가 계속 실패했다.
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    image: skiff-web:latest
+    restart: unless-stopped
+    ports:
+      # 기본값이 8080 이 아닌 이유: 호스트 배포에서 AL2023 기본 nginx 블록을
+      # 127.0.0.1:8080 으로 옮겨 두었다. 같은 서버에서 나란히 띄우면 충돌한다.
+      - "${SKIFF_PORT:-8090}:80"
+    volumes:
+      # nginx 가 X-Accel-Redirect 로 파일을 직접 보낸다. 같은 볼륨이 없으면
+      # 다운로드가 전부 404 가 된다. 읽기 전용으로 붙여 nginx 쪽에서
+      # 실수로 쓰는 일이 없게 한다.
+      - data:/var/lib/skiff:ro
+    depends_on:
+      api:
+        condition: service_healthy
+
+  sweeper:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    image: skiff-api:latest
+    restart: unless-stopped
+    # API 와 같은 이미지를 쓰고 명령만 바꾼다. 정리 로직이 앱 안에 있으므로
+    # 이미지를 따로 만들 이유가 없다.
+    entrypoint: ["/bin/sh", "/opt/sweeper.sh"]
+    volumes:
+      - data:/var/lib/skiff
+      - ./docker/sweeper.sh:/opt/sweeper.sh:ro
+    environment:
+      SKIFF_ENV: production
+      DEPLOY_MODE: single
+      DATA_DIR: /var/lib/skiff
+      IP_HASH_SALT: ${IP_HASH_SALT:?}
+      URL_SIGNING_KEY: ${URL_SIGNING_KEY:?}
+      SWEEP_INTERVAL_SECONDS: ${SWEEP_INTERVAL_SECONDS:-300}
+    depends_on:
+      - api
+
+volumes:
+  # 업로드 파일과 SQLite 가 함께 들어간다. **이 볼륨이 사라지면 모든 전송이
+  # 사라진다** — docker compose down -v 를 무심코 치지 않도록 주의할 것.
+  data:

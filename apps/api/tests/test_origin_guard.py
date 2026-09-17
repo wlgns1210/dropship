@@ -42,7 +42,8 @@ def guarded_client(aws: None, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestC
         with TestClient(app.main.app) as client:
             yield client
     finally:
-        monkeypatch.delenv("ORIGIN_SECRET", raising=False)
+        # 지우면 .env 값이 드러난다. conftest 기본값으로 되돌린다.
+        monkeypatch.setenv("ORIGIN_SECRET", "")
         app.config.get_settings.cache_clear()
         importlib.reload(app.main)
         deps.get_storage.cache_clear()

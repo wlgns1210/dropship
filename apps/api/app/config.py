@@ -6,13 +6,34 @@ from pathlib import Path
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# 레포 루트의 .env 를 읽는다 (apps/api/app/config.py → 3단계 위)
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+def _env_files() -> tuple[Path, ...]:
+    """읽어들일 ``.env`` 후보를 찾는다. 없으면 빈 튜플.
+
+    위로 거슬러 올라가며 찾는다. 예전에는 ``parents[3]`` 으로 고정 깊이를
+    가정했는데, 저장소 구조가 없는 곳에서는 그 깊이 자체가 존재하지 않는다.
+    컨테이너에서 ``/app/app/config.py`` 로 놓이자 IndexError 가 나며 앱이
+    기동조차 못 했다 — 설정을 읽기도 전에 죽으니 원인도 안 보였다.
+
+    파일이 하나도 없어도 정상이다. 컨테이너나 systemd 배포에서는 환경 변수로
+    값이 들어오고 ``.env`` 는 개발 편의 수단일 뿐이다.
+    """
+    found: list[Path] = []
+    for parent in Path(__file__).resolve().parents:
+        for name in (".env", ".env.example"):
+            candidate = parent / name
+            if candidate.is_file() and candidate not in found:
+                found.append(candidate)
+        if found:
+            # 가장 가까운 곳에서 찾으면 더 올라가지 않는다. 상위 디렉터리의
+            # 무관한 .env 를 주워 담는 사고를 막는다.
+            break
+    return tuple(found)
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=(_REPO_ROOT / ".env", _REPO_ROOT / ".env.example"),
+        env_file=_env_files(),
         env_file_encoding="utf-8",
         extra="ignore",
     )

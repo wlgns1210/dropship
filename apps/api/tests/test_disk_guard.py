@@ -38,7 +38,8 @@ def single_node_client(
         with TestClient(app.main.app) as client:
             yield client
     finally:
-        for name in ("DEPLOY_MODE", "DATA_DIR", "URL_SIGNING_KEY"):
+        monkeypatch.setenv("DEPLOY_MODE", "aws")
+        for name in ("DATA_DIR", "URL_SIGNING_KEY"):
             monkeypatch.delenv(name, raising=False)
         app.config.get_settings.cache_clear()
         importlib.reload(app.main)

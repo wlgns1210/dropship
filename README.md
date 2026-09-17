@@ -51,6 +51,30 @@ next build  통과 (out/ 880K)
 | 로그인 | 없음 |
 | 언어 | 한국어 |
 
+## 컨테이너로 실행
+
+```bash
+cp docker/env.example .env      # 비밀값을 채운다 (scripts/gen_secrets.py)
+docker compose up -d --build
+```
+
+`api`(FastAPI) · `web`(nginx + 정적 산출물) · `sweeper`(주기적 정리) 세 개가 뜬다.
+호스트 배포와 같은 구성이고 라우팅 규칙도 같은 파일(`deploy/nginx-app.inc`)을 쓴다.
+
+| 항목 | 값 |
+|---|---|
+| 이미지 크기 | api 211MB · web 49MB |
+| 공개 포트 | `SKIFF_PORT`(기본 8090) → 컨테이너 80 |
+| 데이터 | 이름 있는 볼륨 `data` (업로드 파일 + SQLite) |
+
+주의할 것 두 가지:
+
+- **TLS 가 없다.** 컨테이너 배포는 앞단(로드밸런서·리버스 프록시)이 인증서를
+  끝내는 것이 전제다. 평문으로 공개하면 파일이 그대로 오가고 링크 복사 기능도
+  동작하지 않는다.
+- **`docker compose down -v` 를 조심할 것.** `-v` 는 볼륨까지 지워서 업로드된
+  파일과 모든 공유 링크가 사라진다.
+
 ## 시작하기
 
 필요한 것: Node 20+, Python 3.12+, Docker Desktop

@@ -24,6 +24,13 @@ os.environ.update(
         "DYNAMODB_TABLE": "skiff-test",
         "IP_HASH_SALT": "test-salt",
         "DOWNLOAD_SIGNER": "local",
+        # 개발자의 .env 가 테스트 결과를 바꾸지 못하게 명시적으로 비운다.
+        # 실제로 컨테이너용 .env 를 만들자 그 안의 ADMIN_TOKEN 이 새어 들어와
+        # "토큰이 없으면 관리자 라우터가 등록되지 않는다" 를 검증하는 테스트가
+        # 깨졌다. 설정을 읽는 테스트는 주변 환경에 좌우되면 안 된다.
+        "ADMIN_TOKEN": "",
+        "ORIGIN_SECRET": "",
+        "DEPLOY_MODE": "aws",
     }
 )
 
