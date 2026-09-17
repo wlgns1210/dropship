@@ -1,4 +1,4 @@
-"""Dropship 운영 인프라.
+"""Skiff 운영 인프라.
 
     CloudFront ─┬─ /api/*  → Lambda 함수 URL (FastAPI + Mangum)
                 └─ /*      → S3 (Next.js 정적 산출물)
@@ -65,14 +65,14 @@ from aws_cdk import (
 from constructs import Construct
 
 #: 오리진 시크릿을 실어 보내는 헤더. apps/api/app/config.py 의 값과 같아야 한다.
-ORIGIN_SECRET_HEADER = "x-dropship-origin"
+ORIGIN_SECRET_HEADER = "x-skiff-origin"
 
 #: 업로더가 고를 수 있는 최대 보관 기간(7일)보다 넉넉히 잡은 안전망.
 #: Sweeper 가 계속 실패해도 객체가 영원히 남지는 않게 한다.
 SAFETY_NET_DAYS = 30
 
 
-class DropshipStack(Stack):
+class SkiffStack(Stack):
     def __init__(
         self,
         scope: Construct,
@@ -216,7 +216,7 @@ class DropshipStack(Stack):
         self, files_bucket: s3.Bucket, table: dynamodb.TableV2, ip_hash_salt: str
     ) -> dict[str, str]:
         return {
-            "DROPSHIP_ENV": "production",
+            "SKIFF_ENV": "production",
             # AWS_ENDPOINT_URL 은 아예 넣지 않는다. botocore 도 이 이름의 환경
             # 변수를 읽기 때문에, 빈 문자열을 넣으면 "설정됐지만 비어 있음" 으로
             # 해석될 여지를 만든다. 없으면 기본 해석 경로를 그대로 탄다.
@@ -363,7 +363,7 @@ class DropshipStack(Stack):
         alert_email: str,
         monthly_budget_usd: int,
     ) -> None:
-        topic = sns.Topic(self, "AlertTopic", display_name="Dropship 알림")
+        topic = sns.Topic(self, "AlertTopic", display_name="Skiff 알림")
         if alert_email:
             topic.add_subscription(subs.EmailSubscription(alert_email))
 

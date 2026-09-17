@@ -1,5 +1,5 @@
 [Unit]
-Description=Dropship 만료 정리를 5분마다 실행
+Description=Skiff 만료 정리를 5분마다 실행
 
 [Timer]
 OnBootSec=2min

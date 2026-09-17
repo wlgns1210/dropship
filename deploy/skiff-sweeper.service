@@ -1,26 +1,26 @@
 [Unit]
-Description=Dropship 만료 정리 (Sweeper)
+Description=Skiff 만료 정리 (Sweeper)
 
 [Service]
 Type=oneshot
-User=dropship
-Group=dropship
+User=skiff
+Group=skiff
 
-WorkingDirectory=/opt/dropship/api
-EnvironmentFile=/etc/dropship/dropship.env
+WorkingDirectory=/opt/skiff/api
+EnvironmentFile=/etc/skiff/skiff.env
 
 # 이것이 파일이 실제로 사라지는 주 경로다. AWS 모드의 EventBridge + Lambda 를
 # systemd 타이머로 대체한 것이고, 하는 일은 완전히 같다.
-ExecStart=/opt/dropship/venv/bin/python -m app.sweeper
+ExecStart=/opt/skiff/venv/bin/python -m app.sweeper
 
 # 앱이 만드는 파일을 640, 디렉터리를 750 으로 고정한다.
 # 기본 umask(022)면 업로드 파일과 SQLite DB 가 **누구나 읽을 수 있는** 644 로
 # 만들어진다. DB 에는 owner_token(있으면 남의 전송을 지울 수 있다)과 모든
-# 파일명이 들어 있다. nginx 는 dropship 그룹에 속해 있어 640 으로도 읽는다.
+# 파일명이 들어 있다. nginx 는 skiff 그룹에 속해 있어 640 으로도 읽는다.
 UMask=0027
 
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/var/lib/dropship
+ReadWritePaths=/var/lib/skiff

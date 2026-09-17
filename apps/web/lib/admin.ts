@@ -3,7 +3,7 @@
 import { ko } from "./messages";
 
 const BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
-const TOKEN_KEY = "dropship.admin.token";
+const TOKEN_KEY = "skiff.admin.token";
 
 export interface Meter {
   total: number;

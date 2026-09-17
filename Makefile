@@ -1,4 +1,4 @@
-# Dropship 개발 명령 모음
+# Skiff 개발 명령 모음
 #
 # 처음 받았다면:  make setup && make up && make bootstrap
 # 매일 쓰는 것:   make dev-api  /  make dev-web

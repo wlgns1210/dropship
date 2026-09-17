@@ -19,7 +19,7 @@ from app.routers import transfers
 settings = get_settings()
 
 app = FastAPI(
-    title="Dropship API",
+    title="Skiff API",
     description="익명 파일 전송 — 링크와 QR로 보내고, 정해진 기간이 지나면 사라진다",
     version="0.1.0",
     # 운영에서는 자동 문서를 끈다. 관리자 엔드포인트를 포함한 전체 API 구조와
@@ -81,7 +81,7 @@ if settings.admin_token:
 
 @app.get("/api/health", tags=["meta"])
 def health() -> dict[str, str]:
-    return {"status": "ok", "env": settings.dropship_env, "mode": settings.deploy_mode}
+    return {"status": "ok", "env": settings.skiff_env, "mode": settings.deploy_mode}
 
 
 @app.get("/api/config", tags=["meta"])

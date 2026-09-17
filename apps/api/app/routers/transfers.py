@@ -402,7 +402,7 @@ def stream_all(
 
     repo.bump_download_count(str(body["c"]))
 
-    # dropship-<숫자>.zip — 예: dropship-965005.zip
+    # skiff-<숫자>.zip — 예: skiff-965005.zip
     #
     # 코드의 앞 단어(regina, hanoi 같은 도시명)는 뺀다. 링크를 부르기 쉽게
     # 하려고 붙인 것이지 뜻이 있는 말이 아니라, 파일명에 남으면 받는 사람에게는
@@ -410,7 +410,7 @@ def stream_all(
     #
     # 숫자만으로는 전역 고유가 아니지만(90만 분의 1로 겹칠 수 있다) 브라우저가
     # 알아서 (1) 을 붙이므로 실사용에서는 문제가 되지 않는다.
-    archive_name = "dropship-" + str(body["c"]).split("/")[-1] + ".zip"
+    archive_name = "skiff-" + str(body["c"]).split("/")[-1] + ".zip"
     return StreamingResponse(
         zipstream.stream_zip(entries, created_at=int(transfer["created_at"])),
         media_type="application/zip",

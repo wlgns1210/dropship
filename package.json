@@ -1,5 +1,5 @@
 {
-  "name": "dropship",
+  "name": "skiff",
   "private": true,
   "version": "0.1.0",
   "description": "익명 파일 전송 서비스 — 링크와 QR로 보내고, 정해진 기간이 지나면 사라진다",

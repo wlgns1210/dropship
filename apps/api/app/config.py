@@ -17,7 +17,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    dropship_env: str = "local"
+    skiff_env: str = "local"
 
     #: 배포 형태.
     #:   "aws"    — S3 + DynamoDB + CloudFront + Lambda (서버리스)
@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     # ── 단일 EC2 모드 ──
     #: 파일과 SQLite 가 놓이는 곳
-    data_dir: str = "/var/lib/dropship"
+    data_dir: str = "/var/lib/skiff"
     #: nginx 의 internal location 접두사. X-Accel-Redirect 로 넘길 때 쓴다.
     internal_files_prefix: str = "/protected"
     #: 업로드/다운로드 토큰 서명 키. 비우면 ip_hash_salt 를 재사용한다.
@@ -46,8 +46,8 @@ class Settings(BaseSettings):
     aws_endpoint_url: str | None = None  # LocalStack 전용. 운영에서는 None.
 
     # 저장소
-    s3_bucket: str = "dropship-files-local"
-    dynamodb_table: str = "dropship-local"
+    s3_bucket: str = "skiff-files-local"
+    dynamodb_table: str = "skiff-local"
 
     # 서비스
     #
@@ -85,7 +85,7 @@ class Settings(BaseSettings):
 
     @property
     def is_local(self) -> bool:
-        return self.dropship_env == "local"
+        return self.skiff_env == "local"
 
     @property
     def is_single_node(self) -> bool:
@@ -101,7 +101,7 @@ class Settings(BaseSettings):
 
     @property
     def sqlite_path(self) -> Path:
-        return Path(self.data_dir) / "dropship.db"
+        return Path(self.data_dir) / "skiff.db"
 
 
 @lru_cache
@@ -160,7 +160,7 @@ RATE_LIMITS: dict[str, tuple[int, int]] = {
 }
 
 #: CloudFront 가 오리진 시크릿을 실어 보내는 헤더 이름.
-ORIGIN_SECRET_HEADER = "x-dropship-origin"
+ORIGIN_SECRET_HEADER = "x-skiff-origin"
 
 #: 실행 파일류. 업로드는 허용하되 수신 화면에서 경고를 띄운다.
 RISKY_EXTENSIONS: frozenset[str] = frozenset(

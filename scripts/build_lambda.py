@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 API_DIR = ROOT / "apps" / "api"
 OUT = ROOT / "build" / "lambda"
 
-# Lambda 런타임과 맞춰야 하는 값들 (infra/stacks/dropship_stack.py 참고)
+# Lambda 런타임과 맞춰야 하는 값들 (infra/stacks/skiff_stack.py 참고)
 PYTHON_VERSION = "3.12"
 PLATFORM = "manylinux2014_x86_64"
 

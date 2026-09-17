@@ -6,7 +6,7 @@
  * 영어를 추가할 때는 이 객체와 같은 모양의 en 객체를 만들고 훅으로 고르면 된다.
  */
 export const ko = {
-  brand: "Dropship",
+  brand: "Skiff",
   tagline: "링크 하나로 보내고, 정해진 시간이 지나면 사라집니다",
 
   upload: {
@@ -83,7 +83,7 @@ export const ko = {
     title: "서버 상태",
     updated: (text: string) => `${text} 갱신`,
     signIn: "관리자 토큰을 입력하세요",
-    signInHint: "서버의 /etc/dropship/dropship.env 에 있는 ADMIN_TOKEN 값입니다.",
+    signInHint: "서버의 /etc/skiff/skiff.env 에 있는 ADMIN_TOKEN 값입니다.",
     tokenPlaceholder: "ADMIN_TOKEN",
     enter: "확인",
     signOut: "토큰 지우기",

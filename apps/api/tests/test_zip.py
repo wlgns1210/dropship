@@ -169,7 +169,7 @@ class TestDownloadAllEndpoint:
             assert archive.read("세번째.txt") == b"body2"
 
     def test_archive_filename_is_prefixed_without_the_word(self, client: TestClient) -> None:
-        """dropship-<숫자>.zip
+        """skiff-<숫자>.zip
 
         접두사는 다운로드 폴더에서 출처를 알려준다. 코드의 앞 단어(도시명)는
         링크를 부르기 쉽게 하려고 붙인 것일 뿐 뜻이 없어서, 파일명에 남기면
@@ -184,7 +184,7 @@ class TestDownloadAllEndpoint:
         disposition = client.get(url).headers["content-disposition"]
         name = unquote(disposition.split("''")[-1])
 
-        assert name == f"dropship-{number}.zip"
+        assert name == f"skiff-{number}.zip"
         assert word not in name
 
     def test_duplicate_names_are_separated_in_the_archive(self, client: TestClient) -> None:

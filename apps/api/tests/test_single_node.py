@@ -20,7 +20,7 @@ from app.services.sqlite_repository import SqliteRepository
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
     return Settings(
-        dropship_env="production",
+        skiff_env="production",
         deploy_mode="single",
         data_dir=str(tmp_path),
         ip_hash_salt="test-salt",

@@ -26,10 +26,10 @@ REGION = "ap-northeast-2"
 def production_settings() -> Settings:
     """실제 AWS 를 쓰는 설정 (커스텀 엔드포인트 없음)."""
     return Settings(
-        dropship_env="production",
+        skiff_env="production",
         aws_region=REGION,
         aws_endpoint_url=None,
-        s3_bucket="dropship-test",
+        s3_bucket="skiff-test",
     )
 
 
@@ -76,10 +76,10 @@ class TestLocalStackStillUsesPathStyle:
     def test_custom_endpoint_keeps_path_addressing(self, aws: None) -> None:
         """LocalStack 은 virtual-host 주소를 해석하지 못하므로 path 스타일이어야 한다."""
         settings = Settings(
-            dropship_env="local",
+            skiff_env="local",
             aws_region=REGION,
             aws_endpoint_url="http://localhost:4566",
-            s3_bucket="dropship-test",
+            s3_bucket="skiff-test",
         )
         storage = S3Storage(settings)
         url = storage.presign_download("some/key", "파일.pdf", "application/pdf", 300)
@@ -87,4 +87,4 @@ class TestLocalStackStillUsesPathStyle:
         parsed = urlparse(url)
         assert parsed.netloc == "localhost:4566"
         # path 스타일이면 버킷 이름이 호스트가 아니라 경로에 들어간다
-        assert parsed.path.startswith("/dropship-test/")
+        assert parsed.path.startswith("/skiff-test/")

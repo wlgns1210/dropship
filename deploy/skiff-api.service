@@ -1,30 +1,30 @@
 [Unit]
-Description=Dropship API (FastAPI + uvicorn)
+Description=Skiff API (FastAPI + uvicorn)
 After=network.target
 # 소켓 디렉터리를 먼저 만든다
-RequiresMountsFor=/var/lib/dropship
+RequiresMountsFor=/var/lib/skiff
 
 [Service]
 Type=exec
-User=dropship
-Group=dropship
+User=skiff
+Group=skiff
 
-WorkingDirectory=/opt/dropship/api
-EnvironmentFile=/etc/dropship/dropship.env
+WorkingDirectory=/opt/skiff/api
+EnvironmentFile=/etc/skiff/skiff.env
 
 # 유닉스 소켓으로 nginx 와 붙는다. TCP 포트를 열지 않으므로 방화벽이
 # 뚫려 있어도 API 에 직접 접근할 수 없다 — nginx 를 반드시 거친다.
-RuntimeDirectory=dropship
+RuntimeDirectory=skiff
 RuntimeDirectoryMode=0750
-ExecStart=/opt/dropship/venv/bin/uvicorn app.main:app \
-    --uds /run/dropship/api.sock \
+ExecStart=/opt/skiff/venv/bin/uvicorn app.main:app \
+    --uds /run/skiff/api.sock \
     --workers 2 \
     --proxy-headers \
     --forwarded-allow-ips='*' \
     --log-level info
 
 # nginx 가 소켓에 쓸 수 있어야 한다
-ExecStartPost=/bin/sh -c 'for i in $(seq 1 50); do [ -S /run/dropship/api.sock ] && { chown dropship:nginx /run/dropship/api.sock; chmod 660 /run/dropship/api.sock; exit 0; }; sleep 0.1; done; exit 1'
+ExecStartPost=/bin/sh -c 'for i in $(seq 1 50); do [ -S /run/skiff/api.sock ] && { chown skiff:nginx /run/skiff/api.sock; chmod 660 /run/skiff/api.sock; exit 0; }; sleep 0.1; done; exit 1'
 
 Restart=always
 RestartSec=3
@@ -34,14 +34,14 @@ RestartSec=3
 # 앱이 만드는 파일을 640, 디렉터리를 750 으로 고정한다.
 # 기본 umask(022)면 업로드 파일과 SQLite DB 가 **누구나 읽을 수 있는** 644 로
 # 만들어진다. DB 에는 owner_token(있으면 남의 전송을 지울 수 있다)과 모든
-# 파일명이 들어 있다. nginx 는 dropship 그룹에 속해 있어 640 으로도 읽는다.
+# 파일명이 들어 있다. nginx 는 skiff 그룹에 속해 있어 640 으로도 읽는다.
 UMask=0027
 
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/var/lib/dropship
+ReadWritePaths=/var/lib/skiff
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes

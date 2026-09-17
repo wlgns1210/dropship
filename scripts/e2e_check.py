@@ -13,7 +13,7 @@
     make dev-api                                    # 다른 터미널
     python scripts/e2e_check.py                     # 로컬(LocalStack)
 
-    DROPSHIP_API=https://xxxx.cloudfront.net \\
+    SKIFF_API=https://xxxx.cloudfront.net \\
         python scripts/e2e_check.py                 # 배포된 환경
 
 배포 후에도 같은 스크립트를 돌릴 수 있어야 한다. 로컬에서만 확인하고 배포는
@@ -29,7 +29,7 @@ from urllib.parse import unquote
 
 import httpx
 
-API = os.environ.get("DROPSHIP_API", "http://localhost:8000").rstrip("/")
+API = os.environ.get("SKIFF_API", "http://localhost:8000").rstrip("/")
 PART_SIZE = 8 * 1024 * 1024
 
 _passed = 0

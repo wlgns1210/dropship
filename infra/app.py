@@ -2,7 +2,7 @@
 """CDK 앱 진입점.
 
     cd infra
-    cdk deploy DropshipStack
+    cdk deploy SkiffStack
 
 비밀값은 저장소에 두지 않는다. ``ORIGIN_SECRET`` 과 ``IP_HASH_SALT`` 를 환경
 변수로 넘겨야 하며, 없으면 배포를 거부한다(임시값으로 조용히 배포되는 것이
@@ -15,7 +15,7 @@ import sys
 import aws_cdk as cdk
 
 from stacks.cicd_stack import CicdStack
-from stacks.dropship_stack import DropshipStack
+from stacks.skiff_stack import SkiffStack
 from stacks.global_monitoring_stack import GlobalMonitoringStack
 
 app = cdk.App()
@@ -42,9 +42,9 @@ def required_secret(name: str) -> str:
 # 않는다(알람 자체는 만들어지되 메일이 가지 않는다).
 alert_email = os.environ.get("ALERT_EMAIL") or app.node.try_get_context("alertEmail") or ""
 
-main = DropshipStack(
+main = SkiffStack(
     app,
-    "DropshipStack",
+    "SkiffStack",
     env=env,
     description="익명 파일 전송 서비스 — 링크와 QR로 보내고 기간이 지나면 사라진다",
     origin_secret=required_secret("ORIGIN_SECRET"),
@@ -61,7 +61,7 @@ main = DropshipStack(
 # 한다. 서비스는 서울에 있지만 이 알람만 버지니아에 둔다.
 GlobalMonitoringStack(
     app,
-    "DropshipGlobalMonitoringStack",
+    "SkiffGlobalMonitoringStack",
     env=cdk.Environment(account=env.account, region="us-east-1"),
     description="CloudFront 전송량 알람 (us-east-1 고정)",
     distribution_id=main.distribution_id,
@@ -75,7 +75,7 @@ github_repo = app.node.try_get_context("githubRepo") or ""
 if github_repo:
     CicdStack(
         app,
-        "DropshipCicdStack",
+        "SkiffCicdStack",
         env=env,
         description="GitHub Actions OIDC 배포 역할",
         github_repo=github_repo,

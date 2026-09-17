@@ -1,6 +1,6 @@
-# Dropship — 프로젝트 계획서
+# Skiff — 프로젝트 계획서
 
-익명 파일 전송 서비스. 삼성 Dropship(`g2sh.me`)과 유사한 형태.
+익명 파일 전송 서비스. 삼성 Skiff(`g2sh.me`)과 유사한 형태.
 업로더가 파일을 올리면 짧은 공유 링크 + QR 코드가 생기고, 수신자는 계정 없이 받는다.
 링크는 업로더가 고른 기간이 지나면 만료되고 파일은 삭제된다.
 
@@ -108,13 +108,13 @@ SSR이 나중에 필요해지면 Amplify Hosting으로 갈아타면 된다 (프�
 
 | 리소스 | 용도 | 비고 |
 |---|---|---|
-| S3 `dropship-files` | 파일 저장 | 버킷 비공개, CloudFront OAC로만 접근 |
-| S3 `dropship-web` | 정적 프론트 | 〃 |
+| S3 `skiff-files` | 파일 저장 | 버킷 비공개, CloudFront OAC로만 접근 |
+| S3 `skiff-web` | 정적 프론트 | 〃 |
 | CloudFront | CDN + 라우팅 + 서명 URL | 단일 배포판, 2개 오리진 |
 | API Gateway (HTTP API) | FastAPI 진입점 | REST API보다 약 70% 저렴 |
 | Lambda `api` | FastAPI (Mangum) | ARM64, 512MB, 30s |
 | Lambda `sweeper` | 만료 정리 | EventBridge 5분 주기 |
-| DynamoDB `dropship` | 메타데이터 | On-demand, 단일 테이블 |
+| DynamoDB `skiff` | 메타데이터 | On-demand, 단일 테이블 |
 | AWS WAF | 레이트리밋·봇 차단 | 남용 방지의 1차 방어선 |
 | CloudWatch | 로그·메트릭·알람 | |
 | Secrets Manager | CloudFront 서명 키페어 | |
@@ -173,7 +173,7 @@ SSR이 나중에 필요해지면 Amplify Hosting으로 갈아타면 된다 (프�
 
 ### 형식
 
-삼성 Dropship과 동일한 `단어/숫자` 패턴을 쓴다: `dropship.app/oslo/113245`
+삼성 Skiff과 동일한 `단어/숫자` 패턴을 쓴다: `skiff.app/oslo/113245`
 
 ```
 /{word}/{number}
@@ -225,7 +225,7 @@ UI에서 업로더가 고른다. 기본값 **24시간**.
 {
   "transfer_id": "01J8X...",
   "code": "oslo/113245",
-  "share_url": "https://dropship.app/oslo/113245",
+  "share_url": "https://skiff.app/oslo/113245",
   "delete_token": "unguessable-...",
   "expires_at": 1757886400,
   "uploads": [{
@@ -299,7 +299,7 @@ UI에서 업로더가 고른다. 기본값 **24시간**.
 ## 6. 레포 구조
 
 ```
-Dropship/
+Skiff/
 ├─ apps/
 │  ├─ web/                       # Next.js 15 (static export)
 │  │  ├─ app/

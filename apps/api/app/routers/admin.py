@@ -27,7 +27,7 @@ from app.services import codes, system_stats
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 #: 감시할 systemd 유닛
-_UNITS = ("dropship-api.service", "nginx.service", "dropship-sweeper.timer")
+_UNITS = ("skiff-api.service", "nginx.service", "skiff-sweeper.timer")
 
 
 def require_admin(

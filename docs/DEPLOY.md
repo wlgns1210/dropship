@@ -70,8 +70,8 @@ CDK 는 선언된 것과 실제를 맞추므로, 이 값이 비어 있으면 기
 알림을 **삭제한다.** 배포할 때마다 넣어야 한다. 서버에 두고 쓰려면:
 
 ```bash
-echo 'export ALERT_EMAIL=you@example.com' >> ~/.dropship-secrets
-source ~/.dropship-secrets
+echo 'export ALERT_EMAIL=you@example.com' >> ~/.skiff-secrets
+source ~/.skiff-secrets
 ```
 
 ### `NEXT_PUBLIC_API_BASE_URL=""` 를 빠뜨리지 말 것
@@ -93,7 +93,7 @@ OIDC 로 매 실행마다 임시 자격증명을 받는다.
 ```bash
 # OIDC 역할 생성 (한 번만)
 cd infra
-cdk deploy DropshipCicdStack -c githubRepo=<owner>/<repo>
+cdk deploy SkiffCicdStack -c githubRepo=<owner>/<repo>
 ```
 
 ### GitHub 저장소 시크릿

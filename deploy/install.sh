@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Dropship 단일 EC2 배포 스크립트 (Amazon Linux 2023)
+# Skiff 단일 EC2 배포 스크립트 (Amazon Linux 2023)
 #
 #   sudo bash deploy/install.sh
 #
@@ -7,19 +7,19 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_DIR=/opt/dropship
-DATA_DIR=/var/lib/dropship
-WEB_DIR=/var/www/dropship
-ENV_FILE=/etc/dropship/dropship.env
+APP_DIR=/opt/skiff
+DATA_DIR=/var/lib/skiff
+WEB_DIR=/var/www/skiff
+ENV_FILE=/etc/skiff/skiff.env
 
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
 # ── 사용자 ────────────────────────────────────────────────────
 # 서비스 전용 계정. 로그인 불가, 홈 없음. 익명 업로드를 받는 프로세스가
 # ec2-user 권한으로 돌면 뚫렸을 때 SSH 키까지 읽힌다.
-if ! id dropship &>/dev/null; then
-    say "dropship 사용자 생성"
-    useradd --system --no-create-home --shell /sbin/nologin dropship
+if ! id skiff &>/dev/null; then
+    say "skiff 사용자 생성"
+    useradd --system --no-create-home --shell /sbin/nologin skiff
 fi
 
 # ── 패키지 ────────────────────────────────────────────────────
@@ -29,10 +29,10 @@ dnf install -y -q nginx python3.12 python3.12-pip >/dev/null
 # ── 디렉터리 ──────────────────────────────────────────────────
 say "디렉터리 준비"
 mkdir -p "$APP_DIR" "$DATA_DIR/files" "$WEB_DIR" "$(dirname "$ENV_FILE")"
-chown -R dropship:dropship "$DATA_DIR"
-usermod -a -G dropship nginx
+chown -R skiff:skiff "$DATA_DIR"
+usermod -a -G skiff nginx
 
-# nginx 는 dropship 그룹에 속해 X-Accel-Redirect 로 파일을 읽는다.
+# nginx 는 skiff 그룹에 속해 X-Accel-Redirect 로 파일을 읽는다.
 # 그 외 사용자에게는 아무 권한도 주지 않는다 — 업로드 파일과 SQLite DB 는
 # 남의 파일명과 owner_token 을 담고 있다.
 chmod 750 "$DATA_DIR" "$DATA_DIR/files"
@@ -77,8 +77,8 @@ if [ ! -f "$ENV_FILE" ]; then
     KEY=$(python3 -c 'import secrets;print(secrets.token_urlsafe(48))')
     ADMIN=$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')
     cat > "$ENV_FILE" <<EOF
-# Dropship 단일 EC2 설정. 이 파일은 저장소에 두지 않는다.
-DROPSHIP_ENV=production
+# Skiff 단일 EC2 설정. 이 파일은 저장소에 두지 않는다.
+SKIFF_ENV=production
 DEPLOY_MODE=single
 DATA_DIR=$DATA_DIR
 
@@ -96,7 +96,7 @@ ADMIN_TOKEN=$ADMIN
 ORIGIN_SECRET=
 EOF
     chmod 640 "$ENV_FILE"
-    chown root:dropship "$ENV_FILE"
+    chown root:skiff "$ENV_FILE"
     ADMIN_CREATED=1
 else
     say "환경 파일 유지 (기존 키 보존)"
@@ -104,26 +104,26 @@ fi
 
 # ── systemd ───────────────────────────────────────────────────
 say "systemd 유닛 설치"
-cp "$REPO_DIR/deploy/dropship-api.service" /etc/systemd/system/
-cp "$REPO_DIR/deploy/dropship-sweeper.service" /etc/systemd/system/
-cp "$REPO_DIR/deploy/dropship-sweeper.timer" /etc/systemd/system/
+cp "$REPO_DIR/deploy/skiff-api.service" /etc/systemd/system/
+cp "$REPO_DIR/deploy/skiff-sweeper.service" /etc/systemd/system/
+cp "$REPO_DIR/deploy/skiff-sweeper.timer" /etc/systemd/system/
 systemctl daemon-reload
 
 # ── nginx ─────────────────────────────────────────────────────
 say "nginx 설정"
 # 앱 라우팅은 include 로 한 곳에만 둔다. HTTP(80)와 HTTPS(443) 블록이 같은
 # 파일을 읽으므로, 한쪽만 고쳐서 생기는 불일치가 없다.
-mkdir -p /etc/nginx/dropship-app /etc/nginx/dropship-http /var/www/certbot
-cp "$REPO_DIR/deploy/nginx-app.inc" /etc/nginx/dropship-app/app.conf
-cp "$REPO_DIR/deploy/nginx.conf" /etc/nginx/conf.d/dropship.conf
+mkdir -p /etc/nginx/skiff-app /etc/nginx/skiff-http /var/www/certbot
+cp "$REPO_DIR/deploy/nginx-app.inc" /etc/nginx/skiff-app/app.conf
+cp "$REPO_DIR/deploy/nginx.conf" /etc/nginx/conf.d/skiff.conf
 
 # 80 번 블록: TLS 가 이미 켜져 있으면 리다이렉트를 유지하고, 아니면 앱을
 # 직접 서비스한다. 이 판단이 없으면 재설치할 때마다 HTTPS 리다이렉트가
 # 지워져 평문으로 되돌아간다.
-if [ -f /etc/nginx/dropship-http/redirect.conf ]; then
+if [ -f /etc/nginx/skiff-http/redirect.conf ]; then
     echo "  TLS 리다이렉트 유지"
 else
-    cp "$REPO_DIR/deploy/nginx-app.inc" /etc/nginx/dropship-http/app.conf
+    cp "$REPO_DIR/deploy/nginx-app.inc" /etc/nginx/skiff-http/app.conf
 fi
 
 # AL2023 기본 설정에도 80 번을 듣는 server 블록이 있다. 그대로 두면
@@ -136,18 +136,30 @@ fi
 nginx -t
 
 # ── 기동 ──────────────────────────────────────────────────────
+
+# TLS 가 켜져 있는데 443 블록이 없으면 사이트가 통째로 죽는다. 80 블록은
+# HTTPS 로 리다이렉트하는데 그 HTTPS 에 받아줄 서버 블록이 없기 때문이다.
+# 프로젝트 이름을 바꾸며 실제로 겪었다 — 서비스는 "정상"으로 뜨는데 아무것도
+# 응답하지 않아서 원인을 찾는 데 시간이 걸렸다. 즉시 알아채도록 경고한다.
+if [ -f /etc/nginx/skiff-http/redirect.conf ] && [ ! -f /etc/nginx/conf.d/skiff-tls.conf ]; then
+    echo "" >&2
+    echo "  경고: HTTPS 리다이렉트는 있는데 443 서버 블록이 없습니다." >&2
+    echo "        deploy/enable-tls.sh <호스트명> <이메일> 을 다시 실행하세요." >&2
+    echo "" >&2
+fi
+
 say "서비스 기동"
-systemctl enable --now dropship-api.service
-systemctl restart dropship-api.service
-systemctl enable --now dropship-sweeper.timer
+systemctl enable --now skiff-api.service
+systemctl restart skiff-api.service
+systemctl enable --now skiff-sweeper.timer
 systemctl enable --now nginx
 systemctl reload nginx
 
 sleep 2
 say "상태"
-systemctl is-active dropship-api.service && echo "  API: 정상"
+systemctl is-active skiff-api.service && echo "  API: 정상"
 systemctl is-active nginx && echo "  nginx: 정상"
-systemctl list-timers dropship-sweeper.timer --no-pager | tail -2
+systemctl list-timers skiff-sweeper.timer --no-pager | tail -2
 
 say "완료"
 HOST_IP=$(curl -s --max-time 5 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo '<서버-IP>')
@@ -157,7 +169,7 @@ echo "  http://$HOST_IP"
 if ! grep -q '^ADMIN_TOKEN=' "$ENV_FILE"; then
     ADMIN=$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')
     printf '\n# 관리자 페이지(/admin) 토큰\nADMIN_TOKEN=%s\n' "$ADMIN" >> "$ENV_FILE"
-    systemctl restart dropship-api.service
+    systemctl restart skiff-api.service
     ADMIN_CREATED=1
 fi
 

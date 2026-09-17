@@ -1,6 +1,6 @@
 name: Deploy
 
-# 자동 배포는 아직 꺼져 있다. OIDC 역할(DropshipCicdStack)과 저장소 시크릿이
+# 자동 배포는 아직 꺼져 있다. OIDC 역할(SkiffCicdStack)과 저장소 시크릿이
 # 준비되기 전에 main 에 푸시하면 매번 빨간 X 만 남기 때문이다.
 #
 # 준비가 끝나면 아래 push 트리거의 주석을 풀면 된다 (docs/DEPLOY.md 참고).
@@ -44,7 +44,7 @@ jobs:
       - name: AWS 자격증명 (OIDC — 장기 키 없음)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/dropship-github-deploy
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/skiff-github-deploy
           aws-region: ${{ env.AWS_REGION }}
 
       - name: 프론트엔드 빌드
@@ -67,7 +67,7 @@ jobs:
 
       - name: 배포
         working-directory: infra
-        run: cdk deploy DropshipStack --require-approval never --outputs-file ../cdk-outputs.json
+        run: cdk deploy SkiffStack --require-approval never --outputs-file ../cdk-outputs.json
         env:
           ORIGIN_SECRET: ${{ secrets.ORIGIN_SECRET }}
           IP_HASH_SALT: ${{ secrets.IP_HASH_SALT }}
@@ -76,7 +76,7 @@ jobs:
 
       - name: 배포 결과 요약
         run: |
-          SITE=$(python -c "import json;print(json.load(open('cdk-outputs.json'))['DropshipStack']['SiteUrl'])")
+          SITE=$(python -c "import json;print(json.load(open('cdk-outputs.json'))['SkiffStack']['SiteUrl'])")
           echo "### 배포 완료" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "$SITE" >> "$GITHUB_STEP_SUMMARY"

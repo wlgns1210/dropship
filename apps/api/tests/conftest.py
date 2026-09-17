@@ -13,15 +13,15 @@ import pytest
 # moto 가 실제 자격증명을 집어들지 않도록 임포트 전에 환경을 막아둔다.
 os.environ.update(
     {
-        "DROPSHIP_ENV": "local",
+        "SKIFF_ENV": "local",
         "AWS_REGION": "ap-northeast-2",
         "AWS_ENDPOINT_URL": "",
         "AWS_ACCESS_KEY_ID": "testing",
         "AWS_SECRET_ACCESS_KEY": "testing",
         "AWS_SESSION_TOKEN": "testing",
         "AWS_DEFAULT_REGION": "ap-northeast-2",
-        "S3_BUCKET": "dropship-test",
-        "DYNAMODB_TABLE": "dropship-test",
+        "S3_BUCKET": "skiff-test",
+        "DYNAMODB_TABLE": "skiff-test",
         "IP_HASH_SALT": "test-salt",
         "DOWNLOAD_SIGNER": "local",
     }
@@ -31,8 +31,8 @@ from fastapi.testclient import TestClient
 from moto import mock_aws
 
 REGION = "ap-northeast-2"
-BUCKET = "dropship-test"
-TABLE = "dropship-test"
+BUCKET = "skiff-test"
+TABLE = "skiff-test"
 
 
 @pytest.fixture

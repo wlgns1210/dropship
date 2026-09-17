@@ -24,7 +24,7 @@
     "domainName": "",
     "//certificateArn": "us-east-1 의 ACM 인증서 ARN. domainName 을 쓸 때만 필요.",
     "certificateArn": "",
-    "//githubRepo": "OIDC 배포를 허용할 리포. 예: owner/dropship",
+    "//githubRepo": "OIDC 배포를 허용할 리포. 예: owner/skiff",
     "githubRepo": ""
   }
 }

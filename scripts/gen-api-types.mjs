@@ -25,7 +25,7 @@ if (!response?.ok) {
   process.exit(1);
 }
 
-const schemaPath = join(mkdtempSync(join(tmpdir(), "dropship-")), "openapi.json");
+const schemaPath = join(mkdtempSync(join(tmpdir(), "skiff-")), "openapi.json");
 writeFileSync(schemaPath, JSON.stringify(await response.json()));
 
 execFileSync(

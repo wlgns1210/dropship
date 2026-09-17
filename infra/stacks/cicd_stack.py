@@ -42,7 +42,7 @@ class CicdStack(Stack):
         role = iam.Role(
             self,
             "GithubDeployRole",
-            role_name="dropship-github-deploy",
+            role_name="skiff-github-deploy",
             description=f"{github_repo} 의 {deploy_branch} 브랜치가 맡는 배포 역할",
             max_session_duration=Stack.of(self).node.try_get_context("maxSession") or None,
             assumed_by=iam.WebIdentityPrincipal(

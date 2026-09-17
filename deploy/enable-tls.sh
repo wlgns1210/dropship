@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Dropship — TLS 켜기 (Let's Encrypt)
+# Skiff — TLS 켜기 (Let's Encrypt)
 #
 #   sudo bash deploy/enable-tls.sh <호스트명> <이메일>
 #
@@ -23,7 +23,7 @@ echo "  $HOST -> $RESOLVED"
 
 command -v certbot >/dev/null || dnf install -y -q certbot python3-certbot-nginx
 
-mkdir -p /var/www/certbot /etc/nginx/dropship-app /etc/nginx/dropship-http
+mkdir -p /var/www/certbot /etc/nginx/skiff-app /etc/nginx/skiff-http
 # 챌린지를 받으려면 80 블록이 앱을 서비스하고 있어야 한다. 아직 리다이렉트를
 # 걸지 않은 상태에서 먼저 인증서를 받는다 — 순서를 바꾸면 리다이렉트된 HTTPS
 # 쪽에 인증서가 없어 챌린지 자체가 실패한다.
@@ -42,7 +42,7 @@ else
 fi
 
 say "HTTPS 서버 블록 설치"
-cat > /etc/nginx/conf.d/dropship-tls.conf <<EOF
+cat > /etc/nginx/conf.d/skiff-tls.conf <<EOF
 server {
     listen 443 ssl default_server;
     listen [::]:443 ssl default_server;
@@ -65,13 +65,13 @@ server {
     # 한 번 받은 브라우저는 평문으로 요청조차 하지 않는다.
     add_header Strict-Transport-Security "max-age=31536000" always;
 
-    access_log /var/log/nginx/dropship.access.log;
-    error_log  /var/log/nginx/dropship.error.log;
+    access_log /var/log/nginx/skiff.access.log;
+    error_log  /var/log/nginx/skiff.error.log;
 
-    root /var/www/dropship;
+    root /var/www/skiff;
     index index.html;
 
-    include /etc/nginx/dropship-app/*.conf;
+    include /etc/nginx/skiff-app/*.conf;
 
     gzip on;
     gzip_types text/css application/javascript application/json image/svg+xml;
@@ -82,8 +82,8 @@ EOF
 say "HTTP 를 HTTPS 로 넘기기"
 # 80 번 블록이 읽는 디렉터리에서 앱 라우팅을 빼고 리다이렉트만 남긴다.
 # 둘 다 두면 `location /` 이 중복되어 nginx 가 기동하지 못한다.
-rm -f /etc/nginx/dropship-http/app.conf
-cat > /etc/nginx/dropship-http/redirect.conf <<EOF
+rm -f /etc/nginx/skiff-http/app.conf
+cat > /etc/nginx/skiff-http/redirect.conf <<EOF
 # ACME 챌린지 location 은 이 include 보다 앞에 있어 그대로 동작한다.
 # 인증서 갱신이 리다이렉트에 막히지 않는다.
 location / {

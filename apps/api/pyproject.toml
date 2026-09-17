@@ -1,7 +1,7 @@
 [project]
-name = "dropship-api"
+name = "skiff-api"
 version = "0.1.0"
-description = "Dropship 파일 전송 서비스 API"
+description = "Skiff 파일 전송 서비스 API"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",

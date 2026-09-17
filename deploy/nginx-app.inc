@@ -1,4 +1,4 @@
-# Dropship 앱 라우팅 — HTTP(80) 와 HTTPS(443) 서버 블록이 함께 include 한다.
+# Skiff 앱 라우팅 — HTTP(80) 와 HTTPS(443) 서버 블록이 함께 include 한다.
 #
 # 한 곳에만 두는 이유: 두 블록에 복사해두면 한쪽만 고치는 일이 반드시 생긴다.
 # 특히 X-Accel-Redirect 의 internal 경로가 한쪽에만 있으면 그쪽에서만
@@ -37,7 +37,7 @@ client_body_timeout 300s;
 
 # ── API ──
 location /api/ {
-    proxy_pass http://dropship_api;
+    proxy_pass http://skiff_api;
     proxy_http_version 1.1;
 
     proxy_set_header Host              $host;
@@ -69,7 +69,7 @@ location /api/ {
 # 전환해 sendfile 로 보낸다. Python 은 바이트를 하나도 만지지 않는다.
 location /protected/ {
     internal;
-    alias /var/lib/dropship/files/;
+    alias /var/lib/skiff/files/;
 
     sendfile on;
     tcp_nopush on;

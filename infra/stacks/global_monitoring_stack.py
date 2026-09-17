@@ -38,7 +38,7 @@ class GlobalMonitoringStack(Stack):
 
         # SNS 토픽도 알람과 같은 리전에 있어야 한다.
         # ap-northeast-2 의 토픽을 알람 액션으로 걸 수 없다.
-        topic = sns.Topic(self, "GlobalAlertTopic", display_name="Dropship 전송량 알림")
+        topic = sns.Topic(self, "GlobalAlertTopic", display_name="Skiff 전송량 알림")
         if alert_email:
             topic.add_subscription(subs.EmailSubscription(alert_email))
 
