@@ -71,10 +71,11 @@ services:
     restart: unless-stopped
     # API 와 같은 이미지를 쓰고 명령만 바꾼다. 정리 로직이 앱 안에 있으므로
     # 이미지를 따로 만들 이유가 없다.
-    entrypoint: ["/bin/sh", "/opt/sweeper.sh"]
+    # 스크립트는 이미지 안에 있다. 호스트 파일을 마운트하면 배포용
+    # compose.deploy.yaml 과 동작이 갈려, 한쪽에서만 sweeper 가 뜨는 일이 생긴다.
+    command: ["/usr/local/bin/skiff-sweeper"]
     volumes:
       - data:/var/lib/skiff
-      - ./docker/sweeper.sh:/opt/sweeper.sh:ro
     environment:
       SKIFF_ENV: production
       DEPLOY_MODE: single

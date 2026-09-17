@@ -1,0 +1,80 @@
+# Skiff — 레지스트리에서 받아 띄우는 배포용 compose
+#
+# 저장소를 통째로 받을 필요 없이 **이 파일과 .env 두 개만** 있으면 된다.
+#
+#   curl -O https://raw.githubusercontent.com/<owner>/skiff/main/compose.deploy.yaml
+#   curl -o .env https://raw.githubusercontent.com/<owner>/skiff/main/docker/env.example
+#   # .env 를 채운 뒤
+#   docker compose -f compose.deploy.yaml up -d
+#
+# compose.yaml 과의 차이는 build 대신 image 를 쓴다는 것뿐이다. 그쪽은 소스가
+# 있는 곳에서 쓰고, 이쪽은 다른 VM 에서 받아 쓴다.
+
+name: skiff
+
+x-image: &image
+  # 소유자를 자기 것으로 바꾸거나 SKIFF_REGISTRY 로 덮어쓴다.
+  # 예: SKIFF_REGISTRY=ghcr.io/wlgns1210
+  pull_policy: always
+
+services:
+  api:
+    <<: *image
+    image: ${SKIFF_REGISTRY:-ghcr.io/wlgns1210}/skiff-api:${SKIFF_TAG:-latest}
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      SKIFF_ENV: production
+      DEPLOY_MODE: single
+      DATA_DIR: /var/lib/skiff
+      IP_HASH_SALT: ${IP_HASH_SALT:?IP_HASH_SALT 가 필요합니다}
+      URL_SIGNING_KEY: ${URL_SIGNING_KEY:?URL_SIGNING_KEY 가 필요합니다}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      ORIGIN_SECRET: ""
+    volumes:
+      - data:/var/lib/skiff
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  web:
+    <<: *image
+    image: ${SKIFF_REGISTRY:-ghcr.io/wlgns1210}/skiff-web:${SKIFF_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - "${SKIFF_PORT:-8090}:80"
+    volumes:
+      # nginx 가 X-Accel-Redirect 로 파일을 직접 보낸다. 이 볼륨을 빠뜨리면
+      # 화면은 멀쩡히 뜨는데 다운로드만 404 가 난다.
+      - data:/var/lib/skiff:ro
+    depends_on:
+      api:
+        condition: service_healthy
+
+  sweeper:
+    <<: *image
+    image: ${SKIFF_REGISTRY:-ghcr.io/wlgns1210}/skiff-api:${SKIFF_TAG:-latest}
+    restart: unless-stopped
+    # sweeper.sh 는 이미지 안에 들어 있다. 소스를 받지 않아도 되도록
+    # compose.yaml 과 달리 호스트 파일을 마운트하지 않는다.
+    command: ["/usr/local/bin/skiff-sweeper"]
+    volumes:
+      - data:/var/lib/skiff
+    environment:
+      SKIFF_ENV: production
+      DEPLOY_MODE: single
+      DATA_DIR: /var/lib/skiff
+      IP_HASH_SALT: ${IP_HASH_SALT:?}
+      URL_SIGNING_KEY: ${URL_SIGNING_KEY:?}
+      SWEEP_INTERVAL_SECONDS: ${SWEEP_INTERVAL_SECONDS:-300}
+    depends_on:
+      - api
+
+volumes:
+  # **이 볼륨이 사라지면 업로드된 파일과 모든 공유 링크가 사라진다.**
+  # docker compose down 은 안전하지만 -v 를 붙이면 지워진다.
+  data:

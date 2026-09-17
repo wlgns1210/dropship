@@ -41,6 +41,11 @@ PY
 # ── 앱 ──
 COPY apps/api/app ./app
 
+# 정리 루프를 이미지 안에 넣는다. 배포 VM 은 저장소를 받지 않고 이미지만
+# 가져오므로, 호스트 파일을 마운트하는 방식이면 sweeper 가 뜨지 않는다.
+COPY docker/sweeper.sh /usr/local/bin/skiff-sweeper
+RUN chmod +x /usr/local/bin/skiff-sweeper
+
 # ── 실행 사용자 ──
 # 익명 업로드를 받는 프로세스라 루트로 돌리지 않는다.
 #
