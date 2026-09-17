@@ -68,6 +68,7 @@ export const ko = {
     empty: "빈 파일은 보낼 수 없습니다.",
     rateLimited: "요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.",
     quota: "오늘 업로드 한도를 모두 사용했습니다.",
+    diskFull: "서버 저장 공간이 부족합니다. 잠시 후 다시 시도해 주세요.",
     network: "네트워크 오류가 발생했습니다. 다시 시도해 주세요.",
     uploadFailed: "업로드에 실패했습니다. 다시 시도해 주세요.",
     canceled: "업로드를 취소했습니다.",
@@ -119,6 +120,11 @@ export const ko = {
     bytesToday: "업로드 용량",
     ipsToday: "고유 IP",
     downloadsTotal: "누적 다운로드",
+
+    accepting: "업로드 수용",
+    acceptingYes: "정상",
+    acceptingNo: "중단됨",
+    acceptingNoHint: (text: string) => `여유 ${text} 미만이면 새 업로드를 거절합니다`,
 
     sweeper: "마지막 정리",
     sweeperNever: "기록 없음",

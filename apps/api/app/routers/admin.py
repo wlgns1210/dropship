@@ -20,7 +20,12 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, status
 
-from app.config import DAILY_QUOTA_BYTES, MAX_TOTAL_BYTES, get_settings
+from app.config import (
+    DAILY_QUOTA_BYTES,
+    DISK_HEADROOM_BYTES,
+    MAX_TOTAL_BYTES,
+    get_settings,
+)
 from app.deps import IpHashDep, RepositoryDep, StorageDep, rate_limit
 from app.services import codes, system_stats
 
@@ -72,9 +77,20 @@ async def stats(repo: RepositoryDep) -> dict[str, Any]:
     system["cpu_percent"] = await system_stats.cpu_percent()
 
     files_dir = settings.files_dir
+    disk = system_stats.disk(files_dir if files_dir.exists() else "/")
+
+    # 사용률(%)만으로는 "지금 업로드를 받을 수 있는가" 에 답할 수 없다.
+    # 16GB 디스크의 80% 와 1TB 디스크의 80% 는 남은 양이 전혀 다르다.
+    # 서버가 실제로 쓰는 판단 기준을 그대로 노출한다.
+    accepting = None
+    if disk is not None:
+        accepting = disk["free"] - MAX_TOTAL_BYTES >= DISK_HEADROOM_BYTES
+
     payload: dict[str, Any] = {
         "system": system,
-        "disk": system_stats.disk(files_dir if files_dir.exists() else "/"),
+        "disk": disk,
+        "accepting_uploads": accepting,
+        "disk_headroom_bytes": DISK_HEADROOM_BYTES,
         "files": system_stats.directory_size(files_dir) if files_dir.exists() else None,
         "services": {unit: system_stats.service_state(unit) for unit in _UNITS},
         "policy": {

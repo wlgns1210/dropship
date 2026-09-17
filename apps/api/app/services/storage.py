@@ -151,6 +151,14 @@ class S3Storage:
             return None
         return int(head["ContentLength"])
 
+    def free_bytes(self) -> int | None:
+        """S3 는 용량 한도가 없다.
+
+        None 을 돌려주면 호출부가 공간 검사를 건너뛴다. 단일 노드의 로컬
+        디스크에만 있는 제약이라, 그쪽 구현에만 실제 값이 있다.
+        """
+        return None
+
     def open_stream(self, key: str, chunk_size: int = 1024 * 1024) -> Iterator[bytes]:
         """S3 객체를 조각내어 읽는다. ZIP 일괄 다운로드가 쓴다.
 

@@ -71,6 +71,13 @@ class LocalStorage:
     def _parts_dir(self, key: str) -> Path:
         return self._object_path(key + ".parts")
 
+    def free_bytes(self) -> int | None:
+        """저장소가 놓인 파일시스템의 남은 공간. 조회 실패는 None."""
+        try:
+            return shutil.disk_usage(self._root).free
+        except OSError:
+            return None
+
     # ── 업로드 ────────────────────────────────────────────────
 
     def start_multipart(

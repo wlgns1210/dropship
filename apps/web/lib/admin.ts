@@ -22,6 +22,9 @@ export interface AdminStats {
     now: number;
   };
   disk: (Meter & { free: number }) | null;
+  /** 지금 새 업로드를 받을 수 있는가. 사용률(%)만으로는 답할 수 없는 값이다. */
+  accepting_uploads: boolean | null;
+  disk_headroom_bytes: number;
   files: { files: number; bytes: number; truncated: number } | null;
   services: Record<string, string>;
   policy: { max_total_bytes: number; daily_quota_bytes: number };

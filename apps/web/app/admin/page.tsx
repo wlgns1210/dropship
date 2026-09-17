@@ -209,6 +209,21 @@ function Dashboard({
             percent={disk?.percent ?? null}
             detail={disk ? `${formatBytes(disk.free)} 남음` : undefined}
           />
+          <Tile
+            label={ko.admin.accepting}
+            value={
+              stats.accepting_uploads === null
+                ? "—"
+                : stats.accepting_uploads
+                  ? ko.admin.acceptingYes
+                  : ko.admin.acceptingNo
+            }
+            // 거절 중일 때만 색을 준다. 평상시 숫자는 본문 잉크를 유지한다.
+            accent={
+              stats.accepting_uploads === false ? "var(--status-critical)" : undefined
+            }
+            sub={ko.admin.acceptingNoHint(formatBytes(stats.disk_headroom_bytes))}
+          />
           <Meter
             label={ko.admin.cpu}
             percent={system.cpu_percent}

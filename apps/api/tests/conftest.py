@@ -35,6 +35,23 @@ BUCKET = "skiff-test"
 TABLE = "skiff-test"
 
 
+@pytest.fixture(autouse=True)
+def _ignore_disk_headroom(monkeypatch: pytest.MonkeyPatch) -> None:
+    """디스크 여유 검사를 기본적으로 끈다.
+
+    검사 자체는 운영에서 중요하지만(디스크가 차면 서비스가 죽는다) 대부분의
+    테스트와는 무관하다. 그런데 실제 파일시스템을 재면 테스트가 호스트에
+    좌우된다 — 이 CI 머신의 ``/tmp`` 이 955MB tmpfs 라 여유가 2GB 기준에
+    못 미쳐서, 디스크와 아무 상관없는 테스트들이 503 으로 무더기 실패했다.
+
+    None 은 "용량 한도를 모르는 저장소" 를 뜻하고 호출부가 검사를 건너뛴다.
+    가드 자체를 검증하는 테스트는 test_disk_guard.py 에서 다시 덮어쓴다.
+    """
+    from app.services.local_storage import LocalStorage
+
+    monkeypatch.setattr(LocalStorage, "free_bytes", lambda self: None)
+
+
 @pytest.fixture
 def aws() -> Iterator[None]:
     with mock_aws():

@@ -8,7 +8,12 @@ from fastapi import APIRouter, HTTPException, Path, status
 from fastapi.responses import StreamingResponse
 from ulid import ULID
 
-from app.config import DOWNLOAD_URL_TTL, MAX_TOTAL_BYTES, get_settings
+from app.config import (
+    DISK_HEADROOM_BYTES,
+    DOWNLOAD_URL_TTL,
+    MAX_TOTAL_BYTES,
+    get_settings,
+)
 from app.deps import IpHashDep, Repo, RepositoryDep, SignerDep, Storage, StorageDep, rate_limit
 from app.schemas import (
     CompleteTransferRequest,
@@ -82,6 +87,16 @@ def create_transfer(
     ip_hash: IpHashDep,
 ) -> CreateTransferResponse:
     total_size = payload.total_size
+
+    # 쿼터보다 **먼저** 본다. 공간이 없어 어차피 못 받을 업로드에 쿼터를
+    # 차감하면, 사용자는 올리지도 못한 채 그날 한도만 깎인다.
+    free = storage.free_bytes()
+    if free is not None and free - total_size < DISK_HEADROOM_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="서버 저장 공간이 부족합니다. 잠시 후 다시 시도해 주세요.",
+            headers={"Retry-After": "3600"},
+        )
 
     if not repo.consume_quota(ip_hash, total_size):
         raise HTTPException(
