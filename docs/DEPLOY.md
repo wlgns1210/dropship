@@ -111,21 +111,53 @@ sudo usermod -aG docker "$USER" && newgrp docker
 > 문법이라 `docker-compose`(v1)로는 뜨지 않는다. 공식 저장소의
 > `docker-compose-plugin` 이 있어야 한다.
 
+> **`~` 에서 하지 말 것.** 이 절차의 `curl -o .env` 는 **기존 `.env` 를 빈
+> 템플릿으로 덮어쓴다.** 이미 이 VM 에서 Skiff 를 돌리고 있다면 그 순간
+> `URL_SIGNING_KEY` 가 사라지고, 다음 `up -d` 에서 **이미 발급된 공유 링크가
+> 전부 죽는다.** 새 디렉터리를 만들어 거기서 한다.
+
 ```bash
+# 1. 전용 디렉터리
+mkdir -p ~/skiff && cd ~/skiff
+
 # 2. compose 파일과 환경 파일만 받는다
 curl -O https://raw.githubusercontent.com/<owner>/skiff/main/compose.deploy.yaml
 curl -o .env https://raw.githubusercontent.com/<owner>/skiff/main/docker/env.example
-
-# 3. 비밀값을 채운다
-python3 -c "import secrets;print('IP_HASH_SALT='+secrets.token_urlsafe(48))"
-python3 -c "import secrets;print('URL_SIGNING_KEY='+secrets.token_urlsafe(48))"
-python3 -c "import secrets;print('ADMIN_TOKEN='+secrets.token_urlsafe(32))"
-# 출력을 .env 에 넣고 SKIFF_REGISTRY 를 자기 소유자로 맞춘다
 chmod 600 .env
+
+# 3. 비밀값을 .env 에 **직접 쓴다**
+#
+#    값을 화면에 찍고 손으로 옮겨 적지 않는다. 그 방식은 (1) 옮기는 단계를
+#    빠뜨리면 compose 가 "required variable ... is missing" 으로 거절하고
+#    (2) 비밀값이 터미널 기록과 스크롤백에 남는다.
+for key in IP_HASH_SALT URL_SIGNING_KEY; do
+    value=$(python3 -c "import secrets;print(secrets.token_urlsafe(48))")
+    sed -i "s|^${key}=.*|${key}=${value}|" .env
+done
+value=$(python3 -c "import secrets;print(secrets.token_urlsafe(32))")
+sed -i "s|^ADMIN_TOKEN=.*|ADMIN_TOKEN=${value}|" .env
+unset value
+
+# 채워졌는지 확인 — 값은 찍지 않고 비었는지만 본다
+awk -F= '/^[A-Z_]+=/{print $1, (length($2) ? "OK" : "★ 비어 있음")}' .env
 
 # 4. 기동
 docker compose -f compose.deploy.yaml up -d
 docker compose -f compose.deploy.yaml ps
+```
+
+포크해서 자기 이미지를 쓴다면 `.env` 의 `SKIFF_REGISTRY` 를 자기 소유자로
+바꾼다. 관리자 화면이 필요 없으면 `ADMIN_TOKEN` 은 비워 두면 된다 — 그러면
+`/api/admin/*` 라우터가 아예 등록되지 않는다.
+
+### 이미 돌고 있는 배포를 갱신하는 경우
+
+`.env` 를 다시 받지 않는다. compose 파일만 받는다.
+
+```bash
+cd ~/skiff
+curl -O https://raw.githubusercontent.com/<owner>/skiff/main/compose.deploy.yaml
+docker compose -f compose.deploy.yaml up -d
 ```
 
 ### `.env` 에 들어가는 값
