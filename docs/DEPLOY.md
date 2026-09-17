@@ -98,12 +98,29 @@ ghcr.io/<owner>/skiff-web:latest
 
 저장소를 받을 필요 없다. **파일 두 개면 된다.**
 
-```bash
-# 1. Docker 설치 (Amazon Linux 2023 기준)
-sudo dnf install -y docker
-sudo systemctl enable --now docker
-sudo usermod -aG docker $USER && newgrp docker
+#### Ubuntu (22.04 / 24.04)
 
+```bash
+# 1. Docker 설치 — 공식 저장소를 쓴다
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc]   https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable"   | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io   docker-buildx-plugin docker-compose-plugin
+
+sudo systemctl enable --now docker
+sudo usermod -aG docker "$USER" && newgrp docker
+```
+
+> **`apt install docker.io` 로 설치하지 말 것.** 우분투 기본 저장소의 그 패키지에는
+> `docker compose`(v2 플러그인)가 들어 있지 않다. 이 프로젝트의 compose 파일은 v2
+> 문법이라 `docker-compose`(v1)로는 뜨지 않는다. 공식 저장소의
+> `docker-compose-plugin` 이 있어야 한다.
+
+```bash
 # 2. compose 파일과 환경 파일만 받는다
 curl -O https://raw.githubusercontent.com/<owner>/skiff/main/compose.deploy.yaml
 curl -o .env https://raw.githubusercontent.com/<owner>/skiff/main/docker/env.example
@@ -117,7 +134,57 @@ chmod 600 .env
 
 # 4. 기동
 docker compose -f compose.deploy.yaml up -d
+docker compose -f compose.deploy.yaml ps
 ```
+
+#### ⚠️ 우분투에서 반드시 짚어야 할 것 — Docker 는 ufw 를 우회한다
+
+우분투에는 보통 `ufw` 가 있고, 많은 사람이 이렇게 해두고 안전하다고 믿는다.
+
+```bash
+sudo ufw default deny incoming
+sudo ufw allow 22/tcp
+sudo ufw enable
+```
+
+**그런데 `ports:` 로 공개한 컨테이너 포트는 이 규칙을 무시하고 인터넷에서 그대로
+열린다.** Docker 가 자기 iptables 규칙을 ufw 보다 앞선 체인(DOCKER-USER)에
+넣기 때문이다. 익명 업로드 서비스라 이 차이가 실제 피해로 이어진다 — 막았다고
+생각한 포트로 아무나 파일을 올린다.
+
+두 가지 중 하나를 택한다.
+
+**A. 앞단 프록시만 외부에 노출한다** (권장)
+
+컨테이너를 루프백에만 묶고, 호스트의 nginx·Caddy 가 TLS 를 끝내며 프록시한다.
+
+```bash
+# .env
+SKIFF_PORT=127.0.0.1:8090
+```
+
+`ports: - "127.0.0.1:8090:80"` 으로 해석되어 외부에서 직접 닿을 수 없다.
+이러면 ufw 규칙도 의미를 되찾는다.
+
+**B. DOCKER-USER 체인에 직접 막는다**
+
+```bash
+sudo iptables -I DOCKER-USER -p tcp --dport 8090 ! -s 10.0.0.0/8 -j DROP
+```
+
+재부팅하면 사라지므로 `iptables-persistent` 로 저장해야 한다. A 가 더 단순하다.
+
+#### Amazon Linux 2023
+
+```bash
+sudo dnf install -y docker
+sudo systemctl enable --now docker
+sudo usermod -aG docker "$USER" && newgrp docker
+```
+
+나머지 절차(2~4번)는 우분투와 같다. AL2023 에는 ufw 가 없고 보안 그룹이
+그 역할을 하는데, **보안 그룹은 Docker 우회 문제가 없다** — 인스턴스 밖에서
+거르기 때문이다.
 
 ### 이미지가 private 이면
 
