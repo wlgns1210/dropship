@@ -255,10 +255,15 @@ echo "<TOKEN>" | docker login ghcr.io -u <owner> --password-stdin
 
 ```bash
 curl -O https://raw.githubusercontent.com/<owner>/skiff/main/deploy/verify.sh
-bash verify.sh http://<주소>
+bash verify.sh http://127.0.0.1:8090
 ```
 
 11개 항목이 전부 OK 여야 한다.
+
+> **`curl http://localhost` 는 80 번을 부른다.** 컨테이너는 기본값에서
+> 호스트의 **8090** 에 붙는다. `docker ps` 의 `0.0.0.0:8090->80/tcp` 에서
+> 바깥에서 닿는 것은 **왼쪽**이고, 오른쪽 `80` 은 컨테이너 안에서만 쓰인다.
+> 컨테이너가 전부 healthy 인데 `Connection refused` 가 나면 거의 이 혼동이다.
 
 업로드부터 삭제까지 실제로 왕복시키려면 (저장소가 있는 곳에서, `httpx` 필요):
 

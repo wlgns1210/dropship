@@ -3,6 +3,10 @@
 #
 #   bash deploy/verify.sh [기준주소]
 #
+# 기준주소를 생략하면 http://localhost:8090 을 본다 — SKIFF_PORT 의 기본값이다.
+# 컨테이너는 호스트의 8090 에 붙고 컨테이너 안에서만 80 이다. docker ps 의
+# "0.0.0.0:8090->80/tcp" 에서 바깥에서 닿는 것은 왼쪽이다.
+#
 # **상태 코드만 보지 않는다.** 이 서비스는 매칭되지 않는 경로를 전부
 # 404.html 로 돌려주면서 200 을 낸다(공유 링크를 살리기 위한 설계다).
 # 그래서 "200 이 왔다" 는 페이지가 제대로 떴다는 증거가 되지 못한다 —
@@ -10,7 +14,7 @@
 # 각 페이지가 자기 내용을 담고 있는지를 본문으로 확인한다.
 set -uo pipefail
 
-BASE="${1:-http://localhost}"
+BASE="${1:-http://localhost:8090}"
 PASS=0
 FAIL=0
 
@@ -43,6 +47,24 @@ check_status() {
 
 echo "점검 대상: $BASE"
 echo ""
+
+# 먼저 닿는지부터 본다.
+#
+# 이게 없으면 서버에 연결조차 못 한 경우에도 FAIL 이 11줄 쏟아진다. 항목마다
+# 틀린 것처럼 보여서, 정작 원인(포트를 잘못 봤다)이 그 속에 묻힌다.
+if ! curl -sk -o /dev/null --max-time 10 "$BASE/api/health" 2>/dev/null; then
+    printf '  연결할 수 없다: %s
+
+' "$BASE"
+    echo "  컨테이너가 떠 있는데도 이렇다면 포트를 확인한다."
+    echo "  docker ps 의 \"0.0.0.0:8090->80/tcp\" 에서 **왼쪽**이 바깥에서 닿는 포트다."
+    echo "  오른쪽 80 은 컨테이너 안에서만 쓰인다."
+    echo ""
+    echo "    docker ps --format '{{.Names}}	{{.Ports}}'"
+    echo "    bash verify.sh http://127.0.0.1:<그 포트>"
+    exit 1
+fi
+
 echo "[페이지 — 본문으로 확인]"
 check_body "업로드 화면 /"        "/"              "끌어다 놓으세요"
 
