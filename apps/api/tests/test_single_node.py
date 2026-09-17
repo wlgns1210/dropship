@@ -4,6 +4,7 @@ AWS 모드와 **같은 계약**을 지키는지 본다. 라우터는 어느 구�
 돌아가야 하므로, 두 구현의 동작이 어긋나면 배포 형태를 바꿀 때 조용히 깨진다.
 """
 
+import shutil
 import time
 from pathlib import Path
 from urllib.parse import unquote
@@ -121,6 +122,36 @@ class TestLocalStorage:
 
         with pytest.raises(FileNotFoundError):
             storage.finish_multipart(key, "local", [{"PartNumber": 1}, {"PartNumber": 2}])
+        assert storage.object_size(key) is None
+
+    def test_write_failure_leaves_no_assembling_file(
+        self, storage: LocalStorage, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """이어붙이는 도중 실패해도 .assembling 찌꺼기가 남으면 안 된다.
+
+        파트 누락은 이미 정리됐지만 **쓰기 자체가 실패하는 경우**는 아니었다.
+        디스크가 차면(ENOSPC) copyfileobj 가 OSError 를 내는데, 그때 임시
+        파일이 그대로 남아 이미 부족한 공간을 더 깎았다.
+        """
+        key = "01ABC/0"
+        storage.start_multipart(
+            key=key, mime="text/plain", size=1, expires_in=3600, filename="a.txt"
+        )
+        part = storage.part_path(key, 1)
+        part.parent.mkdir(parents=True, exist_ok=True)
+        part.write_bytes(b"AAA")
+
+        def full_disk(*args: object, **kwargs: object) -> None:
+            raise OSError(28, "No space left on device")
+
+        monkeypatch.setattr(shutil, "copyfileobj", full_disk)
+
+        with pytest.raises(OSError):
+            storage.finish_multipart(key, "local", [{"PartNumber": 1}])
+
+        destination = storage._object_path(key)
+        leftovers = list(destination.parent.glob("*.assembling"))
+        assert leftovers == [], f"임시 파일이 남았다: {leftovers}"
         assert storage.object_size(key) is None
 
     def test_download_token_resolves_to_internal_path(self, storage: LocalStorage) -> None:

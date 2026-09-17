@@ -31,7 +31,8 @@ from app.services import codes, system_stats
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
-#: 감시할 systemd 유닛
+#: 감시할 systemd 유닛. 컨테이너 배포에는 systemd 가 없어 이 목록이 쓰이지
+#: 않고 ``services`` 가 ``None`` 으로 나간다 — 화면은 그 칸을 접는다.
 _UNITS = ("skiff-api.service", "nginx.service", "skiff-sweeper.timer")
 
 
@@ -92,7 +93,7 @@ async def stats(repo: RepositoryDep) -> dict[str, Any]:
         "accepting_uploads": accepting,
         "disk_headroom_bytes": DISK_HEADROOM_BYTES,
         "files": system_stats.directory_size(files_dir) if files_dir.exists() else None,
-        "services": {unit: system_stats.service_state(unit) for unit in _UNITS},
+        "services": system_stats.services(_UNITS),
         "policy": {
             "max_total_bytes": MAX_TOTAL_BYTES,
             "daily_quota_bytes": DAILY_QUOTA_BYTES,

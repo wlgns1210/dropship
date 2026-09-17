@@ -2,6 +2,9 @@
 node_modules/
 .next/
 out/
+# next build 가 매번 새로 만든다. 편집할 일이 없고, 빌드할 때마다
+# git status 에 뜨면 진짜 변경이 묻힌다.
+apps/web/next-env.d.ts
 *.tsbuildinfo
 .eslintcache
 

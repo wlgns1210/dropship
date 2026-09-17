@@ -245,7 +245,10 @@ function Dashboard({
         </div>
       </section>
 
-      {/* ── 서비스 ── 점 + 글자. 색만으로 상태를 읽게 하지 않는다 */}
+      {/* ── 서비스 ── 점 + 글자. 색만으로 상태를 읽게 하지 않는다.
+          컨테이너 배포에는 systemd 가 없어 services 가 null 로 온다. 그때
+          회색 '알 수 없음' 배지를 늘어놓으면 장애와 구분되지 않으므로 접는다. */}
+      {services && Object.keys(services).length > 0 && (
       <section className="admin-section">
         <h2>{ko.admin.services}</h2>
         <div className="admin-grid">
@@ -265,6 +268,7 @@ function Dashboard({
           })}
         </div>
       </section>
+      )}
 
       {/* ── 전송 ── 비교 대상 없는 단일 값들이라 타일 */}
       {transfers && (

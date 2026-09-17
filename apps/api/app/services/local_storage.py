@@ -144,16 +144,28 @@ class LocalStorage:
         temporary = destination.with_suffix(destination.suffix + ".assembling")
 
         numbers = sorted(int(p["PartNumber"]) for p in parts)
-        with temporary.open("wb") as output:
-            for number in numbers:
-                source = self.part_path(key, number)
-                if not source.exists():
-                    temporary.unlink(missing_ok=True)
-                    raise FileNotFoundError(f"파트 {number} 이(가) 없습니다: {key}")
-                with source.open("rb") as chunk:
-                    # copyfileobj 는 고정 버퍼로 옮긴다. 파일 전체를 메모리에
-                    # 올리지 않으므로 1GB 짜리도 안전하다.
-                    shutil.copyfileobj(chunk, output, length=1024 * 1024)
+        try:
+            with temporary.open("wb") as output:
+                for number in numbers:
+                    source = self.part_path(key, number)
+                    if not source.exists():
+                        raise FileNotFoundError(f"파트 {number} 이(가) 없습니다: {key}")
+                    with source.open("rb") as chunk:
+                        # copyfileobj 는 고정 버퍼로 옮긴다. 파일 전체를 메모리에
+                        # 올리지 않으므로 1GB 짜리도 안전하다.
+                        shutil.copyfileobj(chunk, output, length=1024 * 1024)
+        except BaseException:
+            # 정리를 ``with`` **밖**에서 한다. 안에서 지우면 핸들이 아직 열려 있어
+            # 윈도우에서 PermissionError 가 나고, 진짜 원인인 FileNotFoundError 가
+            # 그걸로 덮인다.
+            #
+            # 더 중요한 건 이 자리가 파트 누락만이 아니라 **쓰기 실패 전체**를
+            # 받는다는 점이다. 예전에는 누락일 때만 지워서, 이어붙이는 도중
+            # 디스크가 차면(ENOSPC) .assembling 이 그대로 남았다. 디스크 포화는
+            # 이 서비스가 따로 방어할 만큼 흔한 고장인데, 하필 그때 찌꺼기가
+            # 쌓여 남은 공간을 더 깎는 방향으로 움직였다.
+            temporary.unlink(missing_ok=True)
+            raise
 
         os.replace(temporary, destination)
         shutil.rmtree(self._parts_dir(key), ignore_errors=True)

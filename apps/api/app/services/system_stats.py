@@ -14,6 +14,7 @@ import os
 import shutil
 import subprocess
 import time
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -173,6 +174,21 @@ def directory_size(path: Path, *, max_entries: int = 50_000) -> dict[str, int]:
 # ── systemd ───────────────────────────────────────────────────
 
 
+def systemd_supervised() -> bool:
+    """이 프로세스를 systemd 가 감독하고 있는가.
+
+    컨테이너 배포에서는 아니다. 그런데도 ``systemctl`` 을 부르면 셋 다
+    'unknown' 이 나오고, 관리자 화면에는 회색 점 세 개가 "상태를 모르겠다" 는
+    얼굴로 남는다. **정보가 없는 것과 고장난 것이 화면에서 구분되지 않는다** —
+    운영자가 그걸 보고 뭘 해야 할지 알 수 없으니 칸을 비우는 편이 정직하다.
+
+    ``/run/systemd/system`` 의 존재가 systemd 가 이 네임스페이스의 init 인지를
+    가리는 표준적인 방법이다(systemd 자신이 ``sd_booted`` 로 같은 걸 본다).
+    바이너리만 보면 이미지에 우연히 들어 있는 경우에 속는다.
+    """
+    return Path("/run/systemd/system").is_dir() and shutil.which("systemctl") is not None
+
+
 def service_state(unit: str) -> str:
     """``systemctl is-active`` 결과. 조회 실패는 'unknown'.
 
@@ -189,6 +205,18 @@ def service_state(unit: str) -> str:
         return result.stdout.strip() or "unknown"
     except (OSError, subprocess.SubprocessError):
         return "unknown"
+
+
+def services(units: Iterable[str]) -> dict[str, str] | None:
+    """유닛별 상태. systemd 배포가 아니면 ``None``.
+
+    ``None`` 은 "감시할 유닛이 없다" 는 뜻이고, 화면은 그 칸을 통째로 접는다.
+    빈 dict 가 아니라 None 인 이유는 "유닛이 0개" 와 "해당 없음" 이 다르기
+    때문이다.
+    """
+    if not systemd_supervised():
+        return None
+    return {unit: service_state(unit) for unit in units}
 
 
 def collect_static() -> dict[str, Any]:

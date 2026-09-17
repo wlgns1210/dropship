@@ -26,7 +26,8 @@ export interface AdminStats {
   accepting_uploads: boolean | null;
   disk_headroom_bytes: number;
   files: { files: number; bytes: number; truncated: number } | null;
-  services: Record<string, string>;
+  /** systemd 배포에서만 채워진다. 컨테이너 배포에서는 null 이고 화면은 칸을 접는다. */
+  services: Record<string, string> | null;
   policy: { max_total_bytes: number; daily_quota_bytes: number };
   transfers?: {
     ready: number;

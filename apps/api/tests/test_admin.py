@@ -11,6 +11,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.services import system_stats
+
 TOKEN = "test-admin-token-value-0123456789"
 
 
@@ -98,6 +100,40 @@ class TestPayload:
         assert body["deploy_mode"] == "single"
         assert "system" in body and "services" in body
         assert body["policy"]["max_total_bytes"] == 1024**3
+
+    def test_services_is_none_without_systemd(
+        self, admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """컨테이너 배포에서는 services 가 null 로 나간다.
+
+        예전에는 systemd 가 없어도 ``systemctl`` 을 불러 유닛 셋이 전부
+        'unknown' 으로 나왔다. 관리자 화면에는 회색 점 세 개가 남는데,
+        **정보가 없는 것과 죽은 것이 화면에서 구분되지 않았다.**
+        """
+        monkeypatch.setattr(system_stats, "systemd_supervised", lambda: False)
+
+        body = admin_client.get(
+            "/api/admin/stats", headers={"Authorization": f"Bearer {TOKEN}"}
+        ).json()
+
+        assert body["services"] is None
+
+    def test_services_listed_under_systemd(
+        self, admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """systemd 배포에서는 유닛 상태가 그대로 나온다."""
+        monkeypatch.setattr(system_stats, "systemd_supervised", lambda: True)
+        monkeypatch.setattr(system_stats, "service_state", lambda unit: "active")
+
+        body = admin_client.get(
+            "/api/admin/stats", headers={"Authorization": f"Bearer {TOKEN}"}
+        ).json()
+
+        assert body["services"] == {
+            "skiff-api.service": "active",
+            "nginx.service": "active",
+            "skiff-sweeper.timer": "active",
+        }
 
     def test_reports_app_metrics_in_single_mode(self, admin_client: TestClient) -> None:
         body = admin_client.get(
