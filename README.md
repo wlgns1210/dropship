@@ -120,7 +120,7 @@ scripts        로컬 부트스트랩, Lambda 패키징, E2E 점검, 시크릿 �
 .github        CI(검사) / Image(ghcr.io 이미지) / Deploy(OIDC 배포)
 docs/PLAN.md   설계 문서. 왜 이렇게 만들었는지는 여기 있다.
 docs/DEPLOY.md 배포 절차와 운영 시 주의사항.
-docs/TROUBLESHOOTING.md  실제로 막혔던 것들과 원인.
+docs/TROUBLESHOOTING.md  단일 노드로 옮기며 내린 판단과 터진 것들.
 ```
 
 ## 배포 형태가 두 가지다
